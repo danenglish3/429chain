@@ -1,0 +1,47 @@
+# 429chain configuration
+version: 1
+
+settings:
+  port: 3429
+  apiKeys:
+    - "your-proxy-api-key-here"  # API key(s) that clients use to access this proxy
+  defaultChain: "default"
+  logLevel: info
+  cooldownDefaultMs: 60000       # Default cooldown on 429 (ms)
+  requestTimeoutMs: 30000        # Upstream request timeout (ms)
+
+providers:
+  - id: openrouter
+    name: OpenRouter
+    type: openrouter
+    apiKey: "sk-or-v1-your-key-here"
+    # baseUrl defaults to https://openrouter.ai/api/v1
+
+  - id: groq
+    name: Groq
+    type: groq
+    apiKey: "gsk_your-key-here"
+    # baseUrl defaults to https://api.groq.com/openai/v1
+
+  - id: cerebras
+    name: Cerebras
+    type: cerebras
+    apiKey: "csk-your-key-here"
+    # baseUrl defaults to https://api.cerebras.ai/v1
+
+chains:
+  - name: default
+    entries:
+      - provider: openrouter
+        model: "meta-llama/llama-3.1-8b-instruct:free"
+      - provider: groq
+        model: "llama-3.1-8b-instant"
+      - provider: cerebras
+        model: "llama-3.1-8b"
+
+  - name: fast
+    entries:
+      - provider: groq
+        model: "llama-3.1-8b-instant"
+      - provider: cerebras
+        model: "llama-3.1-8b"
