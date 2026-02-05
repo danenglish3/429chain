@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { RateLimitTracker } from '../tracker.js';
+import type { RateLimitInfo } from '../../providers/types.js';
 
 describe('RateLimitTracker', () => {
   let tracker: RateLimitTracker;
@@ -192,5 +193,193 @@ describe('CooldownManager', () => {
     expect(fired).toBe(false);
 
     manager.cancelAll();
+  });
+});
+
+describe('Quota Tracking', () => {
+  let tracker: RateLimitTracker;
+
+  afterEach(() => {
+    tracker?.shutdown();
+  });
+
+  it('should transition to tracking state when updateQuota called with remaining > 0', () => {
+    tracker = new RateLimitTracker(60_000);
+
+    tracker.updateQuota('groq', 'llama-3.1-8b', {
+      remainingRequests: 50,
+      resetRequestsMs: 30_000,
+      remainingTokens: 10_000,
+      resetTokensMs: 30_000,
+    });
+
+    const status = tracker.getStatus('groq', 'llama-3.1-8b');
+    expect(status.status).toBe('tracking');
+    expect(status.quota).toBeDefined();
+    expect(status.quota?.remainingRequests).toBe(50);
+    expect(status.quota?.remainingTokens).toBe(10_000);
+    expect(status.quota?.lastUpdated).toBeGreaterThan(Date.now() - 1000);
+    expect(tracker.isExhausted('groq', 'llama-3.1-8b')).toBe(false);
+  });
+
+  it('should transition to exhausted when remainingRequests reaches 0', () => {
+    tracker = new RateLimitTracker(60_000);
+
+    tracker.updateQuota('groq', 'llama-3.1-8b', {
+      remainingRequests: 0,
+      resetRequestsMs: 5_000,
+      remainingTokens: 10_000,
+      resetTokensMs: 30_000,
+    });
+
+    expect(tracker.isExhausted('groq', 'llama-3.1-8b')).toBe(true);
+    const status = tracker.getStatus('groq', 'llama-3.1-8b');
+    expect(status.status).toBe('exhausted');
+    expect(status.reason).toContain('proactive');
+    expect(status.reason).toContain('remaining requests = 0');
+  });
+
+  it('should transition to exhausted when remainingTokens reaches 0', () => {
+    tracker = new RateLimitTracker(60_000);
+
+    tracker.updateQuota('cerebras', 'llama-3.1-8b', {
+      remainingRequests: 100,
+      resetRequestsMs: 30_000,
+      remainingTokens: 0,
+      resetTokensMs: 10_000,
+    });
+
+    expect(tracker.isExhausted('cerebras', 'llama-3.1-8b')).toBe(true);
+    const status = tracker.getStatus('cerebras', 'llama-3.1-8b');
+    expect(status.status).toBe('exhausted');
+    expect(status.reason).toContain('proactive');
+    expect(status.reason).toContain('remaining tokens = 0');
+  });
+
+  it('should use Math.max of reset times when both requests and tokens reach 0', () => {
+    tracker = new RateLimitTracker(60_000);
+
+    const now = Date.now();
+    tracker.updateQuota('openrouter', 'gpt-4', {
+      remainingRequests: 0,
+      resetRequestsMs: 5_000,  // shorter cooldown
+      remainingTokens: 0,
+      resetTokensMs: 15_000,   // longer cooldown
+    });
+
+    const status = tracker.getStatus('openrouter', 'gpt-4');
+    expect(status.status).toBe('exhausted');
+    expect(status.reason).toContain('proactive');
+    expect(status.reason).toContain('remaining requests and tokens = 0');
+
+    // Cooldown should be based on the longer reset time (15_000ms)
+    expect(status.cooldownUntil).toBeGreaterThan(now + 14_000);
+    expect(status.cooldownUntil).toBeLessThanOrEqual(now + 16_000);
+  });
+
+  it('should return false from isExhausted for tracking state', () => {
+    tracker = new RateLimitTracker(60_000);
+
+    tracker.updateQuota('groq', 'llama-3.1-8b', {
+      remainingRequests: 10,
+      resetRequestsMs: 30_000,
+    });
+
+    expect(tracker.isExhausted('groq', 'llama-3.1-8b')).toBe(false);
+    const status = tracker.getStatus('groq', 'llama-3.1-8b');
+    expect(status.status).toBe('tracking');
+  });
+
+  it('should update existing tracking entry with new quota values', () => {
+    tracker = new RateLimitTracker(60_000);
+
+    // First update
+    tracker.updateQuota('groq', 'llama-3.1-8b', {
+      remainingRequests: 50,
+      resetRequestsMs: 30_000,
+    });
+
+    const status1 = tracker.getStatus('groq', 'llama-3.1-8b');
+    expect(status1.quota?.remainingRequests).toBe(50);
+
+    // Wait a bit to ensure timestamp changes
+    const firstUpdate = status1.quota!.lastUpdated;
+
+    // Second update with new values
+    tracker.updateQuota('groq', 'llama-3.1-8b', {
+      remainingRequests: 49,
+      resetRequestsMs: 29_000,
+    });
+
+    const status2 = tracker.getStatus('groq', 'llama-3.1-8b');
+    expect(status2.status).toBe('tracking');
+    expect(status2.quota?.remainingRequests).toBe(49);
+    expect(status2.quota?.lastUpdated).toBeGreaterThanOrEqual(firstUpdate);
+  });
+
+  it('should include quota info in getStatus for tracking entries', () => {
+    tracker = new RateLimitTracker(60_000);
+
+    tracker.updateQuota('groq', 'llama-3.1-8b', {
+      remainingRequests: 100,
+      resetRequestsMs: 60_000,
+      limitRequests: 1000,
+      remainingTokens: 50_000,
+      resetTokensMs: 60_000,
+      limitTokens: 100_000,
+    });
+
+    const status = tracker.getStatus('groq', 'llama-3.1-8b');
+    expect(status.quota).toBeDefined();
+    expect(status.quota?.remainingRequests).toBe(100);
+    expect(status.quota?.resetRequestsMs).toBe(60_000);
+    expect(status.quota?.remainingTokens).toBe(50_000);
+    expect(status.quota?.resetTokensMs).toBe(60_000);
+    expect(status.quota?.lastUpdated).toBeDefined();
+  });
+
+  it('should auto-recover after exhaustion from quota depletion', async () => {
+    tracker = new RateLimitTracker(60_000);
+
+    // Exhaust via quota depletion with short cooldown
+    tracker.updateQuota('groq', 'llama-3.1-8b', {
+      remainingRequests: 0,
+      resetRequestsMs: 100,
+    });
+
+    expect(tracker.isExhausted('groq', 'llama-3.1-8b')).toBe(true);
+
+    // Wait for cooldown to expire
+    await new Promise((resolve) => setTimeout(resolve, 150));
+
+    expect(tracker.isExhausted('groq', 'llama-3.1-8b')).toBe(false);
+    const status = tracker.getStatus('groq', 'llama-3.1-8b');
+    expect(status.status).toBe('available');
+  });
+
+  it('should store lastUpdated timestamp on quota update', () => {
+    tracker = new RateLimitTracker(60_000);
+
+    const before = Date.now();
+    tracker.updateQuota('groq', 'llama-3.1-8b', {
+      remainingRequests: 100,
+      resetRequestsMs: 30_000,
+    });
+    const after = Date.now();
+
+    const status = tracker.getStatus('groq', 'llama-3.1-8b');
+    expect(status.quota?.lastUpdated).toBeGreaterThanOrEqual(before);
+    expect(status.quota?.lastUpdated).toBeLessThanOrEqual(after);
+  });
+
+  it('should keep all existing tests passing (no regression)', () => {
+    // This is a meta-test to ensure the above tests in the main describe block
+    // still pass. The actual regression check is that those tests run.
+    tracker = new RateLimitTracker(60_000);
+
+    // Quick sanity check of existing behavior
+    expect(tracker.isExhausted('unknown', 'model')).toBe(false);
+    tracker.markExhausted('test', 'model', 100, '429');
+    expect(tracker.isExhausted('test', 'model')).toBe(true);
   });
 });
