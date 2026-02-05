@@ -14,6 +14,22 @@ import type { CooldownEntry, RateLimitState, TrackerEntry } from './types.js';
 import type { RateLimitInfo } from '../providers/types.js';
 
 /**
+ * Manual rate limit state for a provider+model pair.
+ * Used when provider doesn't send rate limit headers.
+ */
+interface ManualLimitState {
+  requestsPerMinute?: number;
+  tokensPerMinute?: number;
+  requestsPerDay?: number;
+  // Tracking counters
+  requestCount: number;
+  tokenCount: number;
+  windowStart: number; // Date.now() when current minute window started
+  dailyRequestCount: number;
+  dailyWindowStart: number; // Date.now() when current day window started
+}
+
+/**
  * Manages rate limit state for provider+model pairs.
  * Provides isExhausted checks for the chain router and
  * markExhausted/markAvailable transitions for the waterfall logic.
@@ -22,6 +38,7 @@ export class RateLimitTracker {
   private state = new Map<string, TrackerEntry>();
   private cooldownManager: CooldownManager;
   private defaultCooldownMs: number;
+  private manualLimits = new Map<string, ManualLimitState>();
 
   /**
    * @param defaultCooldownMs - Default cooldown duration when no retry-after
@@ -234,6 +251,53 @@ export class RateLimitTracker {
     }
 
     return entries;
+  }
+
+  /**
+   * Register manual rate limits for a provider+model pair.
+   * Used as fallback when provider doesn't send rate limit headers.
+   * @param providerId - Provider instance ID.
+   * @param model - Model ID.
+   * @param limits - Manual rate limit configuration.
+   */
+  registerManualLimits(
+    providerId: string,
+    model: string,
+    limits: {
+      requestsPerMinute?: number;
+      tokensPerMinute?: number;
+      requestsPerDay?: number;
+    },
+  ): void {
+    const k = this.key(providerId, model);
+    const now = Date.now();
+
+    this.manualLimits.set(k, {
+      requestsPerMinute: limits.requestsPerMinute,
+      tokensPerMinute: limits.tokensPerMinute,
+      requestsPerDay: limits.requestsPerDay,
+      requestCount: 0,
+      tokenCount: 0,
+      windowStart: now,
+      dailyRequestCount: 0,
+      dailyWindowStart: now,
+    });
+
+    logger.debug(
+      { providerId, model, limits },
+      `Registered manual rate limits for ${providerId}/${model}`,
+    );
+  }
+
+  /**
+   * Check if manual rate limits are registered for a provider+model pair.
+   * Used by the chain router to determine whether to call recordRequest().
+   * @param providerId - Provider instance ID.
+   * @param model - Model ID.
+   * @returns True if manual limits are registered.
+   */
+  hasManualLimits(providerId: string, model: string): boolean {
+    return this.manualLimits.has(this.key(providerId, model));
   }
 
   /**

@@ -383,3 +383,68 @@ describe('Quota Tracking', () => {
     expect(tracker.isExhausted('test', 'model')).toBe(true);
   });
 });
+
+describe('Manual Rate Limits - Registration', () => {
+  let tracker: RateLimitTracker;
+
+  afterEach(() => {
+    tracker?.shutdown();
+  });
+
+  it('should store manual limits for a provider+model pair', () => {
+    tracker = new RateLimitTracker(60_000);
+
+    tracker.registerManualLimits('groq', 'llama-3.1-8b', {
+      requestsPerMinute: 30,
+      tokensPerMinute: 15000,
+    });
+
+    expect(tracker.hasManualLimits('groq', 'llama-3.1-8b')).toBe(true);
+  });
+
+  it('should return true for hasManualLimits on registered pairs', () => {
+    tracker = new RateLimitTracker(60_000);
+
+    tracker.registerManualLimits('openrouter', 'gpt-4', {
+      requestsPerMinute: 100,
+      tokensPerMinute: 50000,
+      requestsPerDay: 10000,
+    });
+
+    expect(tracker.hasManualLimits('openrouter', 'gpt-4')).toBe(true);
+  });
+
+  it('should return false for hasManualLimits on unregistered pairs', () => {
+    tracker = new RateLimitTracker(60_000);
+
+    tracker.registerManualLimits('groq', 'llama-3.1-8b', {
+      requestsPerMinute: 30,
+    });
+
+    expect(tracker.hasManualLimits('groq', 'llama-3.1-8b')).toBe(true);
+    expect(tracker.hasManualLimits('groq', 'mixtral-8x7b')).toBe(false);
+    expect(tracker.hasManualLimits('cerebras', 'llama-3.1-8b')).toBe(false);
+  });
+
+  it('should allow re-registering (updating) existing manual limits', () => {
+    tracker = new RateLimitTracker(60_000);
+
+    // First registration
+    tracker.registerManualLimits('groq', 'llama-3.1-8b', {
+      requestsPerMinute: 30,
+      tokensPerMinute: 15000,
+    });
+
+    expect(tracker.hasManualLimits('groq', 'llama-3.1-8b')).toBe(true);
+
+    // Re-register with different limits
+    tracker.registerManualLimits('groq', 'llama-3.1-8b', {
+      requestsPerMinute: 60,
+      tokensPerMinute: 30000,
+      requestsPerDay: 14400,
+    });
+
+    // Should still be registered
+    expect(tracker.hasManualLimits('groq', 'llama-3.1-8b')).toBe(true);
+  });
+});
