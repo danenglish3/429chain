@@ -48,6 +48,7 @@ export const SettingsSchema = z.object({
   logLevel: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
   cooldownDefaultMs: z.number().int().min(1000).default(60000),
   requestTimeoutMs: z.number().int().min(1000).default(30000),
+  dbPath: z.string().default('./data/observability.db'),
 });
 
 /** Top-level config schema with cross-reference validation. */
