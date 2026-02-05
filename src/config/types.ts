@@ -10,6 +10,7 @@ import {
   ChainSchema,
   ChainEntrySchema,
   SettingsSchema,
+  RateLimitConfigSchema,
 } from './schema.js';
 
 /** Fully validated proxy configuration. */
@@ -27,6 +28,9 @@ export type ChainEntryConfig = z.infer<typeof ChainEntrySchema>;
 /** Proxy-level settings. */
 export type Settings = z.infer<typeof SettingsSchema>;
 
+/** Per-provider rate limit configuration (manual fallback). */
+export type RateLimitConfig = z.infer<typeof RateLimitConfigSchema>;
+
 // Re-export schemas for convenience
 export {
   ConfigSchema,
@@ -34,4 +38,5 @@ export {
   ChainSchema,
   ChainEntrySchema,
   SettingsSchema,
+  RateLimitConfigSchema,
 } from './schema.js';

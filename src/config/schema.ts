@@ -6,6 +6,14 @@
 
 import { z } from 'zod';
 
+/** Schema for optional per-provider rate limit configuration (fallback when headers unavailable). */
+export const RateLimitConfigSchema = z.object({
+  requestsPerMinute: z.number().int().positive().optional(),
+  tokensPerMinute: z.number().int().positive().optional(),
+  requestsPerDay: z.number().int().positive().optional(),
+  concurrentRequests: z.number().int().positive().optional(),
+});
+
 /** Schema for a single provider definition. */
 export const ProviderSchema = z.object({
   id: z.string().min(1, { message: 'Provider id must not be empty' }),
@@ -13,6 +21,7 @@ export const ProviderSchema = z.object({
   type: z.enum(['openrouter', 'groq', 'cerebras', 'generic-openai']),
   apiKey: z.string().min(1, { message: 'Provider apiKey must not be empty' }),
   baseUrl: z.url({ message: 'Provider baseUrl must be a valid URL' }).optional(),
+  rateLimits: RateLimitConfigSchema.optional(),
 });
 
 /** Schema for a single chain entry (provider + model pair). */
