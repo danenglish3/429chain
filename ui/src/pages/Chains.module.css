@@ -1,0 +1,321 @@
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.title {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 600;
+  color: #111;
+}
+
+.addButton {
+  padding: 10px 20px;
+  background-color: #4f46e5;
+  border: none;
+  border-radius: 6px;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.addButton:hover {
+  background-color: #4338ca;
+}
+
+.loading,
+.error,
+.empty {
+  padding: 48px;
+  text-align: center;
+  color: #666;
+  font-size: 16px;
+}
+
+.error {
+  color: #dc2626;
+}
+
+/* Create Form */
+.formSection {
+  background-color: #fff;
+  border: 1px solid #e5e5e5;
+  border-radius: 8px;
+  padding: 24px;
+  margin-bottom: 24px;
+}
+
+.createForm {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.formRow {
+  display: flex;
+  flex-direction: column;
+}
+
+.label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+}
+
+.input,
+.select {
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  color: #111;
+  background-color: #fff;
+}
+
+.input:focus,
+.select:focus {
+  outline: none;
+  border-color: #4f46e5;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+}
+
+.formError {
+  padding: 8px 12px;
+  background-color: #fee;
+  border: 1px solid #fcc;
+  border-radius: 6px;
+  color: #dc2626;
+  font-size: 13px;
+}
+
+.formActions {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.submitButton {
+  padding: 10px 24px;
+  background-color: #4f46e5;
+  border: none;
+  border-radius: 6px;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.submitButton:hover:not(:disabled) {
+  background-color: #4338ca;
+}
+
+.submitButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.cancelButton {
+  padding: 10px 24px;
+  background-color: #f3f4f6;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  color: #374151;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.cancelButton:hover:not(:disabled) {
+  background-color: #e5e7eb;
+}
+
+.cancelButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Chain List */
+.chainList {
+  display: grid;
+  gap: 16px;
+}
+
+.chainCard {
+  background-color: #fff;
+  border: 1px solid #e5e5e5;
+  border-radius: 8px;
+  padding: 20px;
+  transition: all 0.2s;
+}
+
+.chainCard:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.chainCardDefault {
+  border-color: #4f46e5;
+  border-width: 2px;
+  padding: 19px; /* Compensate for thicker border */
+}
+
+.chainHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.chainInfo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.chainName {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: #111;
+}
+
+.defaultBadge {
+  padding: 4px 10px;
+  background-color: #4f46e5;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.chainMeta {
+  color: #666;
+  font-size: 14px;
+}
+
+.entryCount {
+  font-weight: 500;
+}
+
+/* Chain Entries Preview */
+.chainEntries {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding: 12px;
+  background-color: #f9fafb;
+  border-radius: 6px;
+}
+
+.entryPreview {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-family: 'Courier New', monospace;
+}
+
+.entryIndex {
+  color: #999;
+  min-width: 24px;
+}
+
+.entryProvider {
+  color: #4f46e5;
+  font-weight: 500;
+}
+
+.entrySeparator {
+  color: #ccc;
+}
+
+.entryModel {
+  color: #374151;
+}
+
+/* Chain Actions */
+.chainActions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.editButton {
+  padding: 8px 16px;
+  background-color: #4f46e5;
+  border: none;
+  border-radius: 6px;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.editButton:hover {
+  background-color: #4338ca;
+}
+
+.deleteButton {
+  padding: 8px 16px;
+  background-color: #f3f4f6;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  color: #dc2626;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.deleteButton:hover {
+  background-color: #fee;
+  border-color: #fcc;
+}
+
+.deleteButtonConfirm {
+  padding: 8px 16px;
+  background-color: #dc2626;
+  border: none;
+  border-radius: 6px;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.deleteButtonConfirm:hover:not(:disabled) {
+  background-color: #b91c1c;
+}
+
+.deleteButtonConfirm:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.deleteError {
+  padding: 4px 8px;
+  background-color: #fee;
+  border: 1px solid #fcc;
+  border-radius: 4px;
+  color: #dc2626;
+  font-size: 12px;
+  margin-left: 8px;
+}
