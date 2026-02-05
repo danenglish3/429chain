@@ -6,6 +6,7 @@
 
 import { Hono } from 'hono';
 import { serve } from '@hono/node-server';
+import { serveStatic } from '@hono/node-server/serve-static';
 import { logger } from './shared/logger.js';
 import { loadConfig, resolveConfigPath } from './config/loader.js';
 import { buildRegistry } from './providers/registry.js';
@@ -109,6 +110,23 @@ v1.route('/ratelimits', rateLimitRoutes);
 v1.route('/admin', adminRoutes);
 
 app.route('/v1', v1);
+
+// --- Serve frontend static assets ---
+
+// Serve static assets (JS, CSS, images from Vite build)
+app.use('/assets/*', serveStatic({ root: './ui/dist' }));
+
+// Serve common static files
+app.use('/vite.svg', serveStatic({ path: './ui/dist/vite.svg' }));
+
+// SPA fallback: serve index.html for all non-API routes
+app.get('*', async (c, next) => {
+  // Let API paths fall through to 404
+  if (c.req.path.startsWith('/v1/') || c.req.path.startsWith('/health')) {
+    return next();
+  }
+  return serveStatic({ path: './ui/dist/index.html' })(c, next);
+});
 
 // --- Start server ---
 
