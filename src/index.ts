@@ -16,6 +16,9 @@ import { errorHandler } from './api/middleware/error-handler.js';
 import { createChatRoutes } from './api/routes/chat.js';
 import { createModelsRoutes } from './api/routes/models.js';
 import { createHealthRoutes } from './api/routes/health.js';
+import { initializeDatabase } from './persistence/db.js';
+import { migrateSchema } from './persistence/schema.js';
+import { RequestLogger } from './persistence/request-logger.js';
 
 // --- Bootstrap ---
 
@@ -58,6 +61,11 @@ if (manualLimitCount > 0) {
   logger.info({ count: manualLimitCount }, `Registered ${manualLimitCount} manual rate limit(s)`);
 }
 
+// --- Initialize observability database ---
+const db = initializeDatabase(config.settings.dbPath);
+migrateSchema(db);
+const requestLogger = new RequestLogger(db);
+
 // --- Create Hono application ---
 
 const app = new Hono();
@@ -74,7 +82,7 @@ const auth = createAuthMiddleware(config.settings.apiKeys);
 const v1 = new Hono();
 v1.use('*', auth);
 
-const chatRoutes = createChatRoutes(chains, tracker, registry, config.settings.defaultChain);
+const chatRoutes = createChatRoutes(chains, tracker, registry, config.settings.defaultChain, requestLogger);
 const modelsRoutes = createModelsRoutes(chains);
 
 v1.route('/', chatRoutes);
@@ -110,6 +118,8 @@ const server = serve(
 const shutdown = () => {
   logger.info('Shutting down...');
   tracker.shutdown();
+  db.close();
+  logger.info('Database closed');
   server.close(() => {
     logger.info('Server closed');
     process.exit(0);
