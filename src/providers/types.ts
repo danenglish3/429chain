@@ -81,3 +81,28 @@ export interface ProviderAdapter {
    */
   getExtraHeaders(): Record<string, string>;
 }
+
+/**
+ * Registry of provider adapters, keyed by provider instance ID.
+ * The chain router uses this to look up adapters during waterfall execution.
+ */
+export interface ProviderRegistry {
+  /**
+   * Get a provider adapter by its instance ID.
+   * @param providerId - Provider instance ID from config.
+   * @returns The provider adapter.
+   * @throws Error if the provider ID is not registered.
+   */
+  get(providerId: string): ProviderAdapter;
+
+  /**
+   * Check if a provider ID is registered.
+   * @param providerId - Provider instance ID to check.
+   */
+  has(providerId: string): boolean;
+
+  /**
+   * Get all registered provider adapters.
+   */
+  getAll(): ProviderAdapter[];
+}
