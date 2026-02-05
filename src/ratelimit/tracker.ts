@@ -11,6 +11,7 @@
 import { logger } from '../shared/logger.js';
 import { CooldownManager } from './cooldown.js';
 import type { CooldownEntry, RateLimitState, TrackerEntry } from './types.js';
+import type { RateLimitInfo } from '../providers/types.js';
 
 /**
  * Manages rate limit state for provider+model pairs.
@@ -44,8 +45,8 @@ export class RateLimitTracker {
   isExhausted(providerId: string, model: string): boolean {
     const entry = this.state.get(this.key(providerId, model));
 
-    // Not tracked or explicitly available
-    if (!entry || entry.status === 'available') {
+    // Not tracked, explicitly available, or tracking with quota remaining
+    if (!entry || entry.status === 'available' || entry.status === 'tracking') {
       return false;
     }
 
@@ -119,6 +120,70 @@ export class RateLimitTracker {
   }
 
   /**
+   * Update quota information for a provider+model pair.
+   * Transitions to 'tracking' state if quota remains, or 'exhausted' if depleted.
+   * Proactively marks exhausted when remainingRequests or remainingTokens hits zero.
+   */
+  updateQuota(
+    providerId: string,
+    model: string,
+    info: RateLimitInfo,
+  ): void {
+    const k = this.key(providerId, model);
+
+    // Check if either limit is exhausted
+    const requestsExhausted = info.remainingRequests === 0;
+    const tokensExhausted = info.remainingTokens === 0;
+
+    if (requestsExhausted || tokensExhausted) {
+      // Proactive exhaustion - quota depleted
+      let cooldownMs: number | undefined;
+      let reason: string;
+
+      if (requestsExhausted && tokensExhausted) {
+        // Both exhausted - use the longer cooldown
+        cooldownMs = Math.max(
+          info.resetRequestsMs ?? 0,
+          info.resetTokensMs ?? 0,
+        );
+        reason = 'proactive: remaining requests and tokens = 0';
+      } else if (requestsExhausted) {
+        cooldownMs = info.resetRequestsMs;
+        reason = 'proactive: remaining requests = 0';
+      } else {
+        cooldownMs = info.resetTokensMs;
+        reason = 'proactive: remaining tokens = 0';
+      }
+
+      this.markExhausted(providerId, model, cooldownMs, reason);
+    } else {
+      // Still has quota - transition to tracking state
+      this.state.set(k, {
+        status: 'tracking',
+        cooldownUntil: null,
+        reason: 'tracking quota',
+        quota: {
+          remainingRequests: info.remainingRequests,
+          resetRequestsMs: info.resetRequestsMs,
+          remainingTokens: info.remainingTokens,
+          resetTokensMs: info.resetTokensMs,
+          lastUpdated: Date.now(),
+        },
+      });
+
+      logger.debug(
+        {
+          providerId,
+          model,
+          remainingRequests: info.remainingRequests,
+          remainingTokens: info.remainingTokens,
+        },
+        `Provider ${providerId}/${model} quota updated`,
+      );
+    }
+  }
+
+  /**
    * Get the current status of a specific provider+model pair.
    * Useful for monitoring and debugging.
    */
@@ -142,6 +207,7 @@ export class RateLimitTracker {
       status: entry.status,
       cooldownUntil: entry.cooldownUntil,
       reason: entry.reason,
+      quota: entry.quota,
     };
   }
 
@@ -163,6 +229,7 @@ export class RateLimitTracker {
         status: entry.status,
         cooldownUntil: entry.cooldownUntil,
         reason: entry.reason,
+        quota: entry.quota,
       });
     }
 
