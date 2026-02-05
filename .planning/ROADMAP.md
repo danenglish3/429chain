@@ -41,12 +41,11 @@ Plans:
   1. A developer can send `stream: true` requests and receive real-time SSE chunks with no perceptible buffering delay
   2. Waterfall routing works before streaming begins -- if the first provider is exhausted, the proxy skips to an available provider before starting the stream
   3. When a client disconnects mid-stream, the proxy cleans up the upstream provider connection (no leaked connections or memory)
-**Plans**: 3
+**Plans**: 2
 
 Plans:
-- [ ] 02-01: SSE stream parsing, bridging, and response piping
-- [ ] 02-02: Pre-stream waterfall validation and mid-stream error handling
-- [ ] 02-03: AbortController wiring and client disconnect cleanup
+- [ ] 02-01-PLAN.md -- Streaming types, BaseAdapter.chatCompletionStream(), and SSE parser utility (Wave 1)
+- [ ] 02-02-PLAN.md -- Pre-stream waterfall router and streaming chat route with abort cleanup (Wave 2)
 
 ### Phase 3: Rate Limit Intelligence
 **Goal**: The proxy proactively avoids exhausted providers by tracking rate limit headers, eliminating wasted 429 requests
@@ -115,7 +114,7 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|---------------|--------|-----------|
 | 1. Core Waterfall Proxy | 4/4 | Complete | 2026-02-05 |
-| 2. SSE Streaming | 0/3 | Not started | - |
+| 2. SSE Streaming | 0/2 | Not started | - |
 | 3. Rate Limit Intelligence | 0/3 | Not started | - |
 | 4. Observability & Persistence | 0/3 | Not started | - |
 | 5. Web UI | 0/4 | Not started | - |
@@ -123,4 +122,4 @@ Plans:
 
 ---
 *Roadmap created: 2026-02-05*
-*Last updated: 2026-02-05 after Phase 1 execution complete*
+*Last updated: 2026-02-05 after Phase 2 planning*
