@@ -19,6 +19,9 @@ import { createHealthRoutes } from './api/routes/health.js';
 import { initializeDatabase } from './persistence/db.js';
 import { migrateSchema } from './persistence/schema.js';
 import { RequestLogger } from './persistence/request-logger.js';
+import { UsageAggregator } from './persistence/aggregator.js';
+import { createStatsRoutes } from './api/routes/stats.js';
+import { createRateLimitRoutes } from './api/routes/ratelimits.js';
 
 // --- Bootstrap ---
 
@@ -65,6 +68,7 @@ if (manualLimitCount > 0) {
 const db = initializeDatabase(config.settings.dbPath);
 migrateSchema(db);
 const requestLogger = new RequestLogger(db);
+const aggregator = new UsageAggregator(db);
 
 // --- Create Hono application ---
 
@@ -84,9 +88,13 @@ v1.use('*', auth);
 
 const chatRoutes = createChatRoutes(chains, tracker, registry, config.settings.defaultChain, requestLogger);
 const modelsRoutes = createModelsRoutes(chains);
+const statsRoutes = createStatsRoutes(aggregator);
+const rateLimitRoutes = createRateLimitRoutes(tracker);
 
 v1.route('/', chatRoutes);
 v1.route('/', modelsRoutes);
+v1.route('/stats', statsRoutes);
+v1.route('/ratelimits', rateLimitRoutes);
 
 app.route('/v1', v1);
 
@@ -107,6 +115,7 @@ const server = serve(
         providers: registry.size,
         chains: chains.size,
         defaultChain: config.settings.defaultChain,
+        dbPath: config.settings.dbPath,
       },
       'Ready',
     );
