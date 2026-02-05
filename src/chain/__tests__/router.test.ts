@@ -747,3 +747,157 @@ describe('resolveChain', () => {
     );
   });
 });
+
+describe('Manual rate limit fallback', () => {
+  let tracker: RateLimitTracker;
+
+  beforeEach(() => {
+    tracker = new RateLimitTracker(60_000);
+  });
+
+  afterEach(() => {
+    tracker.shutdown();
+  });
+
+  it('should call recordRequest when no headers but manual limits exist', async () => {
+    // Create adapter with no rate limit headers
+    const adapter = createSuccessAdapter('provider-a', null);
+    const registry = createRegistry([adapter]);
+
+    // Register manual limits
+    tracker.registerManualLimits('provider-a', 'model-1', {
+      requestsPerMinute: 30,
+    });
+
+    const chain: Chain = {
+      name: 'test-chain',
+      entries: [{ providerId: 'provider-a', model: 'model-1' }],
+    };
+
+    // Spy on recordRequest
+    const recordRequestSpy = vi.spyOn(tracker, 'recordRequest');
+
+    const result = await executeChain(chain, makeRequest(), tracker, registry);
+
+    expect(result.providerId).toBe('provider-a');
+    expect(recordRequestSpy).toHaveBeenCalledWith('provider-a', 'model-1');
+    expect(recordRequestSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('should NOT call recordRequest when no headers and NO manual limits', async () => {
+    const adapter = createSuccessAdapter('provider-a', null);
+    const registry = createRegistry([adapter]);
+
+    // Do NOT register manual limits
+
+    const chain: Chain = {
+      name: 'test-chain',
+      entries: [{ providerId: 'provider-a', model: 'model-1' }],
+    };
+
+    const recordRequestSpy = vi.spyOn(tracker, 'recordRequest');
+
+    const result = await executeChain(chain, makeRequest(), tracker, registry);
+
+    expect(result.providerId).toBe('provider-a');
+    expect(recordRequestSpy).not.toHaveBeenCalled();
+  });
+
+  it('should NOT call recordRequest when headers present (header path takes precedence)', async () => {
+    const rateLimitInfo: RateLimitInfo = {
+      remainingRequests: 50,
+      resetRequestsMs: 10000,
+    };
+    const adapter = createSuccessAdapter('provider-a', rateLimitInfo);
+    const registry = createRegistry([adapter]);
+
+    // Register manual limits (but headers should take precedence)
+    tracker.registerManualLimits('provider-a', 'model-1', {
+      requestsPerMinute: 30,
+    });
+
+    const chain: Chain = {
+      name: 'test-chain',
+      entries: [{ providerId: 'provider-a', model: 'model-1' }],
+    };
+
+    const recordRequestSpy = vi.spyOn(tracker, 'recordRequest');
+    const updateQuotaSpy = vi.spyOn(tracker, 'updateQuota');
+
+    const result = await executeChain(chain, makeRequest(), tracker, registry);
+
+    expect(result.providerId).toBe('provider-a');
+    expect(updateQuotaSpy).toHaveBeenCalledWith('provider-a', 'model-1', rateLimitInfo);
+    expect(recordRequestSpy).not.toHaveBeenCalled();
+  });
+
+  it('should call recordRequest in streaming path when no headers but manual limits exist', async () => {
+    // Create streaming adapter with no rate limit headers
+    const adapter: ProviderAdapter = {
+      id: 'provider-a',
+      providerType: 'test',
+      name: 'Test provider-a',
+      baseUrl: 'https://provider-a.example.com',
+      chatCompletion: vi.fn(),
+      chatCompletionStream: vi.fn(async () => {
+        return new Response('data: {"choices":[{"delta":{"content":"test"}}]}', {
+          status: 200,
+          headers: {}, // No rate limit headers
+        });
+      }),
+      parseRateLimitHeaders: vi.fn(() => null),
+      getExtraHeaders: () => ({}),
+    };
+
+    const registry = createRegistry([adapter]);
+
+    // Register manual limits
+    tracker.registerManualLimits('provider-a', 'model-1', {
+      requestsPerMinute: 30,
+    });
+
+    const chain: Chain = {
+      name: 'test-chain',
+      entries: [{ providerId: 'provider-a', model: 'model-1' }],
+    };
+
+    const recordRequestSpy = vi.spyOn(tracker, 'recordRequest');
+
+    const result = await executeStreamChain(chain, makeRequest(), tracker, registry);
+
+    expect(result.providerId).toBe('provider-a');
+    expect(recordRequestSpy).toHaveBeenCalledWith('provider-a', 'model-1');
+    expect(recordRequestSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('should exhaust provider after enough requests to exceed manual RPM limit', async () => {
+    const adapter = createSuccessAdapter('provider-a', null);
+    const registry = createRegistry([adapter]);
+
+    // Register manual limits with low RPM
+    tracker.registerManualLimits('provider-a', 'model-1', {
+      requestsPerMinute: 3,
+    });
+
+    const chain: Chain = {
+      name: 'test-chain',
+      entries: [{ providerId: 'provider-a', model: 'model-1' }],
+    };
+
+    // First 3 requests should succeed
+    for (let i = 0; i < 3; i++) {
+      const result = await executeChain(chain, makeRequest(), tracker, registry);
+      expect(result.providerId).toBe('provider-a');
+    }
+
+    // Provider should now be exhausted
+    expect(tracker.isExhausted('provider-a', 'model-1')).toBe(true);
+    const status = tracker.getStatus('provider-a', 'model-1');
+    expect(status.reason).toBe('manual limit: RPM exceeded');
+
+    // Next request should throw AllProvidersExhaustedError
+    await expect(
+      executeChain(chain, makeRequest(), tracker, registry),
+    ).rejects.toThrow(AllProvidersExhaustedError);
+  });
+});

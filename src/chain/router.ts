@@ -68,6 +68,9 @@ export async function executeChain(
       const rateLimitInfo = adapter.parseRateLimitHeaders(result.headers);
       if (rateLimitInfo) {
         tracker.updateQuota(entry.providerId, entry.model, rateLimitInfo);
+      } else if (tracker.hasManualLimits(entry.providerId, entry.model)) {
+        // No headers from provider -- fall back to manual limit tracking
+        tracker.recordRequest(entry.providerId, entry.model);
       }
 
       logger.info(
@@ -228,6 +231,8 @@ export async function executeStreamChain(
       const rateLimitInfo = adapter.parseRateLimitHeaders(response.headers);
       if (rateLimitInfo) {
         tracker.updateQuota(entry.providerId, entry.model, rateLimitInfo);
+      } else if (tracker.hasManualLimits(entry.providerId, entry.model)) {
+        tracker.recordRequest(entry.providerId, entry.model);
       }
 
       logger.info(
