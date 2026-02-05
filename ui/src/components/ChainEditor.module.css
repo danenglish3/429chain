@@ -1,0 +1,256 @@
+.container {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #e5e5e5;
+}
+
+.headerLeft {
+  flex: 1;
+}
+
+.title {
+  margin: 0 0 6px 0;
+  font-size: 24px;
+  font-weight: 600;
+  color: #111;
+}
+
+.subtitle {
+  margin: 0;
+  font-size: 14px;
+  color: #666;
+}
+
+.closeButton {
+  padding: 8px 16px;
+  background-color: #f3f4f6;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  color: #374151;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.closeButton:hover {
+  background-color: #e5e7eb;
+}
+
+.error {
+  padding: 12px 16px;
+  background-color: #fee;
+  border: 1px solid #fcc;
+  border-radius: 6px;
+  color: #dc2626;
+  margin-bottom: 16px;
+  font-size: 14px;
+}
+
+.saving {
+  padding: 8px 16px;
+  background-color: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 6px;
+  color: #1e40af;
+  margin-bottom: 16px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+/* Entries Section */
+.entriesSection {
+  background-color: #fff;
+  border: 1px solid #e5e5e5;
+  border-radius: 8px;
+  padding: 20px;
+}
+
+.sectionTitle {
+  margin: 0 0 16px 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #111;
+}
+
+.entryList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Sortable Entry Styles */
+.entry {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background-color: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+
+.entry:hover {
+  background-color: #f3f4f6;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.dragHandle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #9ca3af;
+  cursor: grab;
+  transition: color 0.2s;
+}
+
+.dragHandle:hover {
+  color: #6b7280;
+}
+
+.dragHandle:active {
+  cursor: grabbing;
+}
+
+.entryContent {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  font-family: 'Courier New', monospace;
+  font-size: 14px;
+}
+
+.entryProvider {
+  color: #4f46e5;
+  font-weight: 500;
+}
+
+.entrySeparator {
+  color: #ccc;
+}
+
+.entryModel {
+  color: #374151;
+}
+
+.removeButton {
+  padding: 6px 12px;
+  background-color: #fff;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  color: #dc2626;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.removeButton:hover:not(:disabled) {
+  background-color: #fee;
+  border-color: #fcc;
+}
+
+.removeButton:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  color: #9ca3af;
+}
+
+/* Add Entry Section */
+.addSection {
+  background-color: #fff;
+  border: 1px solid #e5e5e5;
+  border-radius: 8px;
+  padding: 20px;
+}
+
+.addForm {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.addFormFields {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 12px;
+}
+
+.formField {
+  display: flex;
+  flex-direction: column;
+}
+
+.label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+}
+
+.select,
+.input {
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  color: #111;
+  background-color: #fff;
+}
+
+.select:focus,
+.input:focus {
+  outline: none;
+  border-color: #4f46e5;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+}
+
+.addError {
+  padding: 8px 12px;
+  background-color: #fee;
+  border: 1px solid #fcc;
+  border-radius: 6px;
+  color: #dc2626;
+  font-size: 13px;
+}
+
+.addButton {
+  align-self: flex-start;
+  padding: 10px 24px;
+  background-color: #4f46e5;
+  border: none;
+  border-radius: 6px;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.addButton:hover:not(:disabled) {
+  background-color: #4338ca;
+}
+
+.addButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
