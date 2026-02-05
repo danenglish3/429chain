@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-02-05)
 
 **Core value:** Requests never fail due to rate limits when free tokens exist somewhere in the chain
-**Current focus:** Phase 3 in progress - Rate Limit Intelligence
+**Current focus:** Phase 4 in progress - Observability & Persistence
 
 ## Current Position
 
-Phase: 3 of 6 (Rate Limit Intelligence) -- COMPLETE
-Plan: 4 of 4 in current phase
-Status: Phase complete
-Last activity: 2026-02-05 -- Completed 03-04-PLAN.md (Manual rate limit initialization)
+Phase: 4 of 6 (Observability & Persistence)
+Plan: 1 of 4 in current phase
+Status: In progress
+Last activity: 2026-02-05 -- Completed 04-01-PLAN.md (SQLite persistence foundation)
 
-Progress: [##########..........] 55%
+Progress: [###########.........] 60%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 10
-- Average duration: ~4.5 minutes
-- Total execution time: ~45 minutes
+- Total plans completed: 11
+- Average duration: ~4.6 minutes
+- Total execution time: ~51 minutes
 
 **By Phase:**
 
@@ -30,6 +30,7 @@ Progress: [##########..........] 55%
 | 1 - Core Waterfall Proxy | 4/4 | ~25min | ~6.25min |
 | 2 - SSE Streaming | 2/2 | ~6min | ~3min |
 | 3 - Rate Limit Intelligence | 4/4 | ~14min | ~3.5min |
+| 4 - Observability & Persistence | 1/4 | ~6.5min | ~6.5min |
 
 ## Accumulated Context
 
@@ -66,6 +67,10 @@ Recent decisions affecting current work:
 - [d026] Manual limits registered only for provider+model pairs found in chains (not all possible combinations)
 - [d027] Manual limit registration happens after tracker creation but before server starts
 - [d028] Manual limit count logged at startup for configuration visibility
+- [d029] SQLite with WAL mode for observability persistence (concurrent reads during writes, file-based deployment simplicity)
+- [d030] Materialized aggregation tables with SQLite triggers (O(1) stats reads, no application-level aggregation)
+- [d031] Fire-and-forget request logging with no error propagation (observability never fails proxy requests)
+- [d032] Timestamp stored as INTEGER (Unix epoch ms for efficient sorting and time-range queries)
 
 ### Pending Todos
 
@@ -77,6 +82,19 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-05T07:41:48Z
-Stopped at: Completed 03-04-PLAN.md (Manual rate limit initialization) - Phase 3 complete
+Last session: 2026-02-05T19:54:27Z
+Stopped at: Completed 04-01-PLAN.md (SQLite persistence foundation)
 Resume file: None
+
+Config:
+{
+  "mode": "yolo",
+  "depth": "standard",
+  "parallelization": true,
+  "commit_docs": true,
+  "workflow": {
+    "research": true,
+    "plan_check": true,
+    "verifier": true
+  }
+}
