@@ -446,6 +446,136 @@ describe('executeChain', () => {
   });
 });
 
+describe('Proactive quota tracking (non-streaming)', () => {
+  let tracker: RateLimitTracker;
+
+  beforeEach(() => {
+    tracker = new RateLimitTracker(60_000);
+  });
+
+  afterEach(() => {
+    tracker.shutdown();
+  });
+
+  it('should call tracker.updateQuota on successful response with headers', async () => {
+    const rateLimitInfo: RateLimitInfo = {
+      remainingRequests: 10,
+      resetRequestsMs: 5000,
+      remainingTokens: 1000,
+      resetTokensMs: 5000,
+    };
+    const adapter = createSuccessAdapter('provider-a', rateLimitInfo);
+    const registry = createRegistry([adapter]);
+
+    const chain: Chain = {
+      name: 'test-chain',
+      entries: [{ providerId: 'provider-a', model: 'model-1' }],
+    };
+
+    // Spy on updateQuota
+    const updateQuotaSpy = vi.spyOn(tracker, 'updateQuota');
+
+    const result = await executeChain(chain, makeRequest(), tracker, registry);
+
+    expect(result.providerId).toBe('provider-a');
+    expect(updateQuotaSpy).toHaveBeenCalledWith('provider-a', 'model-1', rateLimitInfo);
+    expect(adapter.parseRateLimitHeaders).toHaveBeenCalledTimes(1);
+  });
+
+  it('should mark provider exhausted when remainingTokens === 0', async () => {
+    const rateLimitInfo: RateLimitInfo = {
+      remainingRequests: 10,
+      resetRequestsMs: 5000,
+      remainingTokens: 0,
+      resetTokensMs: 8000,
+    };
+    const adapter = createSuccessAdapter('provider-a', rateLimitInfo);
+    const registry = createRegistry([adapter]);
+
+    const chain: Chain = {
+      name: 'test-chain',
+      entries: [{ providerId: 'provider-a', model: 'model-1' }],
+    };
+
+    // First request succeeds but marks exhausted
+    const result = await executeChain(chain, makeRequest(), tracker, registry);
+    expect(result.providerId).toBe('provider-a');
+
+    // Provider should now be exhausted on next call
+    expect(tracker.isExhausted('provider-a', 'model-1')).toBe(true);
+    const status = tracker.getStatus('provider-a', 'model-1');
+    expect(status.status).toBe('exhausted');
+    expect(status.reason).toBe('proactive: remaining tokens = 0');
+  });
+
+  it('should keep provider in tracking state when remaining > 0', async () => {
+    const rateLimitInfo: RateLimitInfo = {
+      remainingRequests: 50,
+      resetRequestsMs: 10000,
+      remainingTokens: 5000,
+      resetTokensMs: 10000,
+    };
+    const adapter = createSuccessAdapter('provider-a', rateLimitInfo);
+    const registry = createRegistry([adapter]);
+
+    const chain: Chain = {
+      name: 'test-chain',
+      entries: [{ providerId: 'provider-a', model: 'model-1' }],
+    };
+
+    const result = await executeChain(chain, makeRequest(), tracker, registry);
+    expect(result.providerId).toBe('provider-a');
+
+    // Provider should NOT be exhausted
+    expect(tracker.isExhausted('provider-a', 'model-1')).toBe(false);
+    const status = tracker.getStatus('provider-a', 'model-1');
+    expect(status.status).toBe('tracking');
+    expect(status.quota?.remainingRequests).toBe(50);
+    expect(status.quota?.remainingTokens).toBe(5000);
+  });
+
+  it('should not call updateQuota when no rate limit headers', async () => {
+    const adapter = createSuccessAdapter('provider-a', null);
+    const registry = createRegistry([adapter]);
+
+    const chain: Chain = {
+      name: 'test-chain',
+      entries: [{ providerId: 'provider-a', model: 'model-1' }],
+    };
+
+    const updateQuotaSpy = vi.spyOn(tracker, 'updateQuota');
+
+    const result = await executeChain(chain, makeRequest(), tracker, registry);
+    expect(result.providerId).toBe('provider-a');
+    expect(updateQuotaSpy).not.toHaveBeenCalled();
+    expect(adapter.parseRateLimitHeaders).toHaveBeenCalledTimes(1);
+  });
+
+  it('should mark exhausted when both requests and tokens are zero', async () => {
+    const rateLimitInfo: RateLimitInfo = {
+      remainingRequests: 0,
+      resetRequestsMs: 5000,
+      remainingTokens: 0,
+      resetTokensMs: 8000,
+    };
+    const adapter = createSuccessAdapter('provider-a', rateLimitInfo);
+    const registry = createRegistry([adapter]);
+
+    const chain: Chain = {
+      name: 'test-chain',
+      entries: [{ providerId: 'provider-a', model: 'model-1' }],
+    };
+
+    const result = await executeChain(chain, makeRequest(), tracker, registry);
+    expect(result.providerId).toBe('provider-a');
+
+    expect(tracker.isExhausted('provider-a', 'model-1')).toBe(true);
+    const status = tracker.getStatus('provider-a', 'model-1');
+    expect(status.status).toBe('exhausted');
+    expect(status.reason).toBe('proactive: remaining requests and tokens = 0');
+  });
+});
+
 describe('resolveChain', () => {
   const chains = new Map<string, Chain>();
   chains.set('fast', {

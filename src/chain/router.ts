@@ -64,17 +64,10 @@ export async function executeChain(
 
       const latencyMs = performance.now() - attemptStart;
 
-      // Parse rate limit headers from successful response
+      // Parse rate limit headers from successful response and update quota tracking
       const rateLimitInfo = adapter.parseRateLimitHeaders(result.headers);
-      if (rateLimitInfo && rateLimitInfo.remainingRequests === 0) {
-        // Proactively mark exhausted: this was the last allowed request
-        const cooldownMs = rateLimitInfo.resetRequestsMs ?? undefined;
-        tracker.markExhausted(
-          entry.providerId,
-          entry.model,
-          cooldownMs,
-          'proactive: remaining requests = 0',
-        );
+      if (rateLimitInfo) {
+        tracker.updateQuota(entry.providerId, entry.model, rateLimitInfo);
       }
 
       logger.info(
