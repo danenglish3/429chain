@@ -71,12 +71,12 @@ Plans:
   1. Every request is logged with the provider used, model, tokens consumed (prompt + completion), latency, and HTTP status
   2. Users can query aggregate usage totals per provider (total tokens, total requests) and per chain
   3. Users can see live rate limit status for each provider -- remaining requests per minute, daily tokens left, and active cooldown timers
-**Plans**: 3
+**Plans**: 3 plans
 
 Plans:
-- [ ] 04-01: SQLite persistence layer and request logging
-- [ ] 04-02: Usage aggregation engine (per-provider and per-chain totals)
-- [ ] 04-03: Live rate limit status API and stats endpoints
+- [ ] 04-01-PLAN.md -- SQLite persistence module: better-sqlite3, config schema, DB init, schema migration, RequestLogger, UsageAggregator
+- [ ] 04-02-PLAN.md -- Request logging wiring: DB bootstrap in index.ts, fire-and-forget logging in chat routes, streaming token capture
+- [ ] 04-03-PLAN.md -- Stats and rate limit status API endpoints: usage queries and live provider status
 
 ### Phase 5: Web UI
 **Goal**: Users can manage providers, chains, and monitor usage through a browser-based dashboard without editing config files
@@ -117,10 +117,10 @@ Plans:
 | 1. Core Waterfall Proxy | 4/4 | Complete | 2026-02-05 |
 | 2. SSE Streaming | 2/2 | Complete | 2026-02-05 |
 | 3. Rate Limit Intelligence | 4/4 | Complete | 2026-02-05 |
-| 4. Observability & Persistence | 0/3 | Not started | - |
+| 4. Observability & Persistence | 0/3 | In progress | - |
 | 5. Web UI | 0/4 | Not started | - |
 | 6. Docker Deployment | 0/3 | Not started | - |
 
 ---
 *Roadmap created: 2026-02-05*
-*Last updated: 2026-02-05 after Phase 3 completion (verified)*
+*Last updated: 2026-02-06 after Phase 4 planning*
