@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-02-05)
 ## Current Position
 
 Phase: 5 of 6 (Web UI)
-Plan: 1 of 3 in current phase -- COMPLETE
+Plan: 2 of 3 in current phase -- COMPLETE
 Status: In progress
-Last activity: 2026-02-06 -- Completed 05-01-PLAN.md
+Last activity: 2026-02-06 -- Completed 05-02-PLAN.md
 
-Progress: [###############.....] 74%
+Progress: [################....] 80%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 14
-- Average duration: ~4.6 minutes
-- Total execution time: ~69 minutes
+- Total plans completed: 15
+- Average duration: ~5.4 minutes
+- Total execution time: ~81 minutes
 
 **By Phase:**
 
@@ -31,7 +31,7 @@ Progress: [###############.....] 74%
 | 2 - SSE Streaming | 2/2 | ~6min | ~3min |
 | 3 - Rate Limit Intelligence | 4/4 | ~14min | ~3.5min |
 | 4 - Observability & Persistence | 3/3 | ~17min | ~5.7min |
-| 5 - Web UI | 1/3 | ~8min | ~8min |
+| 5 - Web UI | 2/3 | ~20min | ~10min |
 
 ## Accumulated Context
 
@@ -82,6 +82,11 @@ Recent decisions affecting current work:
 - [d040] DELETE /chains/:name prevents default chain deletion (referential integrity)
 - [d041] PUT endpoints validate with Zod, return 400 with prettified errors on validation failure
 - [d042] Provider apiKey masked as "***" in GET responses for security
+- [d043] Vite proxy pattern: /v1/* and /health proxy to backend during dev (avoid CORS)
+- [d044] Backend serves SPA static files via serveStatic middleware (single-server deployment)
+- [d045] sessionStorage for API key (auto-clear on 401, survives page reload)
+- [d046] CSS Modules for component styles (scoped class names, type-safe)
+- [d047] Placeholder pages created upfront (router stable, pages implemented in later plans)
 
 ### Pending Todos
 
@@ -94,7 +99,7 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-06
-Stopped at: Completed 05-01-PLAN.md (Admin CRUD API endpoints)
+Stopped at: Completed 05-02-PLAN.md (React SPA scaffold)
 Resume file: None
 
 Config:
