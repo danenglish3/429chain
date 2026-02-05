@@ -31,6 +31,33 @@ const registry = buildRegistry(config.providers);
 const chains = buildChains(config, registry);
 const tracker = new RateLimitTracker(config.settings.cooldownDefaultMs);
 
+// --- Register manual rate limits from config ---
+
+let manualLimitCount = 0;
+for (const provider of config.providers) {
+  if (!provider.rateLimits) continue;
+
+  // Collect all models used with this provider across all chains
+  const models = new Set<string>();
+  for (const chainConfig of config.chains) {
+    for (const entry of chainConfig.entries) {
+      if (entry.provider === provider.id) {
+        models.add(entry.model);
+      }
+    }
+  }
+
+  // Register manual limits for each provider+model pair
+  for (const model of models) {
+    tracker.registerManualLimits(provider.id, model, provider.rateLimits);
+    manualLimitCount++;
+  }
+}
+
+if (manualLimitCount > 0) {
+  logger.info({ count: manualLimitCount }, `Registered ${manualLimitCount} manual rate limit(s)`);
+}
+
 // --- Create Hono application ---
 
 const app = new Hono();
