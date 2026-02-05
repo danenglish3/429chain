@@ -90,17 +90,17 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| PRXY-01 | Phase 1 | Pending |
+| PRXY-01 | Phase 1 | Complete |
 | PRXY-02 | Phase 2 | Pending |
-| PRXY-03 | Phase 1 | Pending |
-| PRXY-04 | Phase 1 | Pending |
-| PRXY-05 | Phase 1 | Pending |
-| PRXY-06 | Phase 1 | Pending |
-| CHAN-01 | Phase 1 | Pending |
-| CHAN-02 | Phase 1 | Pending |
-| CHAN-03 | Phase 1 | Pending |
-| RATE-01 | Phase 1 | Pending |
-| RATE-02 | Phase 1 | Pending |
+| PRXY-03 | Phase 1 | Complete |
+| PRXY-04 | Phase 1 | Complete |
+| PRXY-05 | Phase 1 | Complete |
+| PRXY-06 | Phase 1 | Complete |
+| CHAN-01 | Phase 1 | Complete |
+| CHAN-02 | Phase 1 | Complete |
+| CHAN-03 | Phase 1 | Complete |
+| RATE-01 | Phase 1 | Complete |
+| RATE-02 | Phase 1 | Complete |
 | RATE-03 | Phase 3 | Pending |
 | RATE-04 | Phase 3 | Pending |
 | RATE-05 | Phase 3 | Pending |
@@ -112,9 +112,9 @@
 | WEBU-02 | Phase 5 | Pending |
 | WEBU-03 | Phase 5 | Pending |
 | WEBU-04 | Phase 5 | Pending |
-| DEPL-01 | Phase 1 | Pending |
+| DEPL-01 | Phase 1 | Complete |
 | DEPL-02 | Phase 6 | Pending |
-| DEPL-03 | Phase 1 | Pending |
+| DEPL-03 | Phase 1 | Complete |
 
 **Coverage:**
 - v1 requirements: 25 total
@@ -123,4 +123,4 @@
 
 ---
 *Requirements defined: 2026-02-05*
-*Last updated: 2026-02-05 after roadmap creation*
+*Last updated: 2026-02-05 after Phase 1 completion*
