@@ -301,6 +301,90 @@ export class RateLimitTracker {
   }
 
   /**
+   * Record a request and enforce manual rate limits.
+   * Only called when provider doesn't send rate limit headers (fallback).
+   * @param providerId - Provider instance ID.
+   * @param model - Model ID.
+   * @param tokensUsed - Optional token count for this request.
+   */
+  recordRequest(providerId: string, model: string, tokensUsed?: number): void {
+    const k = this.key(providerId, model);
+    const state = this.manualLimits.get(k);
+
+    // No manual limits registered - no-op
+    if (!state) {
+      return;
+    }
+
+    const now = Date.now();
+    const MINUTE_MS = 60_000;
+    const DAY_MS = 86_400_000;
+
+    // Reset minute window if elapsed
+    if (now - state.windowStart > MINUTE_MS) {
+      state.requestCount = 0;
+      state.tokenCount = 0;
+      state.windowStart = now;
+    }
+
+    // Reset daily window if elapsed
+    if (now - state.dailyWindowStart > DAY_MS) {
+      state.dailyRequestCount = 0;
+      state.dailyWindowStart = now;
+    }
+
+    // Increment counters
+    state.requestCount++;
+    if (tokensUsed !== undefined) {
+      state.tokenCount += tokensUsed;
+    }
+    state.dailyRequestCount++;
+
+    // Check for limit exhaustion
+    if (
+      state.requestsPerMinute !== undefined &&
+      state.requestCount >= state.requestsPerMinute
+    ) {
+      const cooldownMs = MINUTE_MS - (now - state.windowStart);
+      this.markExhausted(
+        providerId,
+        model,
+        cooldownMs,
+        'manual limit: RPM exceeded',
+      );
+      return;
+    }
+
+    if (
+      state.tokensPerMinute !== undefined &&
+      state.tokenCount >= state.tokensPerMinute
+    ) {
+      const cooldownMs = MINUTE_MS - (now - state.windowStart);
+      this.markExhausted(
+        providerId,
+        model,
+        cooldownMs,
+        'manual limit: TPM exceeded',
+      );
+      return;
+    }
+
+    if (
+      state.requestsPerDay !== undefined &&
+      state.dailyRequestCount >= state.requestsPerDay
+    ) {
+      const cooldownMs = DAY_MS - (now - state.dailyWindowStart);
+      this.markExhausted(
+        providerId,
+        model,
+        cooldownMs,
+        'manual limit: daily request limit exceeded',
+      );
+      return;
+    }
+  }
+
+  /**
    * Shut down the tracker, cancelling all pending cooldown timers.
    * Call this during graceful process shutdown.
    */

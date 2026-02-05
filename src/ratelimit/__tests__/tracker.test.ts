@@ -448,3 +448,165 @@ describe('Manual Rate Limits - Registration', () => {
     expect(tracker.hasManualLimits('groq', 'llama-3.1-8b')).toBe(true);
   });
 });
+
+describe('Manual Rate Limits - Enforcement', () => {
+  let tracker: RateLimitTracker;
+
+  afterEach(() => {
+    tracker?.shutdown();
+    vi.useRealTimers();
+  });
+
+  it('should increment count and NOT exhaust when under limit', () => {
+    tracker = new RateLimitTracker(60_000);
+
+    tracker.registerManualLimits('groq', 'llama-3.1-8b', {
+      requestsPerMinute: 30,
+      tokensPerMinute: 15000,
+    });
+
+    // Record a few requests
+    tracker.recordRequest('groq', 'llama-3.1-8b', 100);
+    tracker.recordRequest('groq', 'llama-3.1-8b', 150);
+    tracker.recordRequest('groq', 'llama-3.1-8b', 200);
+
+    // Should not be exhausted
+    expect(tracker.isExhausted('groq', 'llama-3.1-8b')).toBe(false);
+  });
+
+  it('should exhaust when requestsPerMinute is reached', () => {
+    tracker = new RateLimitTracker(60_000);
+
+    tracker.registerManualLimits('groq', 'llama-3.1-8b', {
+      requestsPerMinute: 3,
+    });
+
+    // Record requests up to limit
+    tracker.recordRequest('groq', 'llama-3.1-8b');
+    expect(tracker.isExhausted('groq', 'llama-3.1-8b')).toBe(false);
+
+    tracker.recordRequest('groq', 'llama-3.1-8b');
+    expect(tracker.isExhausted('groq', 'llama-3.1-8b')).toBe(false);
+
+    tracker.recordRequest('groq', 'llama-3.1-8b');
+    // Should now be exhausted
+    expect(tracker.isExhausted('groq', 'llama-3.1-8b')).toBe(true);
+    const status = tracker.getStatus('groq', 'llama-3.1-8b');
+    expect(status.reason).toBe('manual limit: RPM exceeded');
+  });
+
+  it('should exhaust when tokensPerMinute is reached', () => {
+    tracker = new RateLimitTracker(60_000);
+
+    tracker.registerManualLimits('groq', 'llama-3.1-8b', {
+      tokensPerMinute: 500,
+    });
+
+    // Record requests with token counts
+    tracker.recordRequest('groq', 'llama-3.1-8b', 200);
+    expect(tracker.isExhausted('groq', 'llama-3.1-8b')).toBe(false);
+
+    tracker.recordRequest('groq', 'llama-3.1-8b', 200);
+    expect(tracker.isExhausted('groq', 'llama-3.1-8b')).toBe(false);
+
+    tracker.recordRequest('groq', 'llama-3.1-8b', 100);
+    // Should now be exhausted (200 + 200 + 100 = 500)
+    expect(tracker.isExhausted('groq', 'llama-3.1-8b')).toBe(true);
+    const status = tracker.getStatus('groq', 'llama-3.1-8b');
+    expect(status.reason).toBe('manual limit: TPM exceeded');
+  });
+
+  it('should reset counters when minute window elapses', () => {
+    vi.useFakeTimers();
+    tracker = new RateLimitTracker(60_000);
+
+    tracker.registerManualLimits('groq', 'llama-3.1-8b', {
+      requestsPerMinute: 3,
+    });
+
+    // Record requests up to just below limit
+    tracker.recordRequest('groq', 'llama-3.1-8b');
+    tracker.recordRequest('groq', 'llama-3.1-8b');
+
+    // Advance time by 61 seconds (past the minute window)
+    vi.advanceTimersByTime(61_000);
+
+    // Window should have reset, so this request shouldn't exhaust
+    tracker.recordRequest('groq', 'llama-3.1-8b');
+    expect(tracker.isExhausted('groq', 'llama-3.1-8b')).toBe(false);
+  });
+
+  it('should exhaust when requestsPerDay is reached', () => {
+    tracker = new RateLimitTracker(60_000);
+
+    tracker.registerManualLimits('groq', 'llama-3.1-8b', {
+      requestsPerDay: 5,
+    });
+
+    // Record requests up to limit
+    for (let i = 0; i < 4; i++) {
+      tracker.recordRequest('groq', 'llama-3.1-8b');
+      expect(tracker.isExhausted('groq', 'llama-3.1-8b')).toBe(false);
+    }
+
+    // 5th request should exhaust
+    tracker.recordRequest('groq', 'llama-3.1-8b');
+    expect(tracker.isExhausted('groq', 'llama-3.1-8b')).toBe(true);
+    const status = tracker.getStatus('groq', 'llama-3.1-8b');
+    expect(status.reason).toBe('manual limit: daily request limit exceeded');
+  });
+
+  it('should reset daily counters when day window elapses', () => {
+    vi.useFakeTimers();
+    tracker = new RateLimitTracker(60_000);
+
+    tracker.registerManualLimits('groq', 'llama-3.1-8b', {
+      requestsPerDay: 3,
+    });
+
+    // Record requests up to just below limit
+    tracker.recordRequest('groq', 'llama-3.1-8b');
+    tracker.recordRequest('groq', 'llama-3.1-8b');
+
+    // Advance time by 25 hours (past the day window)
+    vi.advanceTimersByTime(25 * 60 * 60 * 1000);
+
+    // Window should have reset, so this request shouldn't exhaust
+    tracker.recordRequest('groq', 'llama-3.1-8b');
+    expect(tracker.isExhausted('groq', 'llama-3.1-8b')).toBe(false);
+  });
+
+  it('should not interfere with header-based tracking', () => {
+    tracker = new RateLimitTracker(60_000);
+
+    // Register manual limits
+    tracker.registerManualLimits('groq', 'llama-3.1-8b', {
+      requestsPerMinute: 30,
+    });
+
+    // Update quota via headers (header-based tracking)
+    tracker.updateQuota('groq', 'llama-3.1-8b', {
+      remainingRequests: 10,
+      resetRequestsMs: 5000,
+    });
+
+    // Should be in tracking state, not exhausted
+    expect(tracker.isExhausted('groq', 'llama-3.1-8b')).toBe(false);
+    const status = tracker.getStatus('groq', 'llama-3.1-8b');
+    expect(status.status).toBe('tracking');
+    expect(status.quota?.remainingRequests).toBe(10);
+  });
+
+  it('should be a no-op for providers without manual limits registered', () => {
+    tracker = new RateLimitTracker(60_000);
+
+    // Don't register any manual limits
+    // recordRequest should be a no-op
+    tracker.recordRequest('groq', 'llama-3.1-8b', 1000);
+    tracker.recordRequest('groq', 'llama-3.1-8b', 1000);
+    tracker.recordRequest('groq', 'llama-3.1-8b', 1000);
+
+    // Should not be exhausted
+    expect(tracker.isExhausted('groq', 'llama-3.1-8b')).toBe(false);
+  });
+});
