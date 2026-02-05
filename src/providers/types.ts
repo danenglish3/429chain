@@ -105,4 +105,9 @@ export interface ProviderRegistry {
    * Get all registered provider adapters.
    */
   getAll(): ProviderAdapter[];
+
+  /**
+   * Number of registered providers.
+   */
+  readonly size: number;
 }

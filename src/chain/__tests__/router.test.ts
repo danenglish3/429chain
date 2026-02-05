@@ -132,6 +132,9 @@ function createRegistry(adapters: ProviderAdapter[]): ProviderRegistry {
     getAll(): ProviderAdapter[] {
       return [...map.values()];
     },
+    get size(): number {
+      return map.size;
+    },
   };
 }
 
