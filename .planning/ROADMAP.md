@@ -7,7 +7,7 @@
 ## Phases
 
 - [x] **Phase 1: Core Waterfall Proxy** - Non-streaming OpenAI-compatible proxy with waterfall routing on 429
-- [ ] **Phase 2: SSE Streaming** - Real-time streaming support for chat completions
+- [x] **Phase 2: SSE Streaming** - Real-time streaming support for chat completions
 - [ ] **Phase 3: Rate Limit Intelligence** - Proactive header tracking and intelligent provider skipping
 - [ ] **Phase 4: Observability & Persistence** - Request logging, usage tracking, and stats aggregation
 - [ ] **Phase 5: Web UI** - Browser-based dashboard for provider/chain management and monitoring
@@ -44,8 +44,8 @@ Plans:
 **Plans**: 2
 
 Plans:
-- [ ] 02-01-PLAN.md -- Streaming types, BaseAdapter.chatCompletionStream(), and SSE parser utility (Wave 1)
-- [ ] 02-02-PLAN.md -- Pre-stream waterfall router and streaming chat route with abort cleanup (Wave 2)
+- [x] 02-01-PLAN.md -- Streaming types, BaseAdapter.chatCompletionStream(), and SSE parser utility (Wave 1)
+- [x] 02-02-PLAN.md -- Pre-stream waterfall router and streaming chat route with abort cleanup (Wave 2)
 
 ### Phase 3: Rate Limit Intelligence
 **Goal**: The proxy proactively avoids exhausted providers by tracking rate limit headers, eliminating wasted 429 requests
@@ -114,7 +114,7 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|---------------|--------|-----------|
 | 1. Core Waterfall Proxy | 4/4 | Complete | 2026-02-05 |
-| 2. SSE Streaming | 0/2 | Not started | - |
+| 2. SSE Streaming | 2/2 | Complete | 2026-02-05 |
 | 3. Rate Limit Intelligence | 0/3 | Not started | - |
 | 4. Observability & Persistence | 0/3 | Not started | - |
 | 5. Web UI | 0/4 | Not started | - |
@@ -122,4 +122,4 @@ Plans:
 
 ---
 *Roadmap created: 2026-02-05*
-*Last updated: 2026-02-05 after Phase 2 planning*
+*Last updated: 2026-02-05 after Phase 2 completion*
