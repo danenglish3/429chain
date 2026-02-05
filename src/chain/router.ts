@@ -17,7 +17,7 @@ import {
 import type { AttemptRecord, ChatCompletionRequest } from '../shared/types.js';
 import type { ProviderRegistry } from '../providers/types.js';
 import type { RateLimitTracker } from '../ratelimit/tracker.js';
-import type { Chain, ChainResult } from './types.js';
+import type { Chain, ChainResult, StreamChainResult } from './types.js';
 
 /**
  * Execute a chain: iterate entries in order, skip exhausted providers,
@@ -189,6 +189,132 @@ export async function executeChain(
       attempts,
     },
     `All providers exhausted in chain "${chain.name}"`,
+  );
+
+  throw new AllProvidersExhaustedError(chain.name, attempts);
+}
+
+/**
+ * Execute a chain for streaming: iterate entries in order, skip exhausted,
+ * waterfall on failure, return the first successful raw streaming Response.
+ *
+ * This performs PRE-STREAM validation: the provider connection is opened
+ * and validated (non-429, non-error) BEFORE returning to the caller.
+ * The caller then pipes the ReadableStream body to the client.
+ */
+export async function executeStreamChain(
+  chain: Chain,
+  request: ChatCompletionRequest,
+  tracker: RateLimitTracker,
+  registry: ProviderRegistry,
+  signal?: AbortSignal,
+): Promise<StreamChainResult> {
+  const attempts: AttemptRecord[] = [];
+
+  for (const entry of chain.entries) {
+    if (tracker.isExhausted(entry.providerId, entry.model)) {
+      logger.info(
+        { provider: entry.providerId, model: entry.model, chain: chain.name },
+        `Skipping ${entry.providerId}/${entry.model} (on cooldown) [stream]`,
+      );
+      attempts.push({
+        provider: entry.providerId,
+        model: entry.model,
+        error: 'on_cooldown',
+        skipped: true,
+      });
+      continue;
+    }
+
+    const adapter = registry.get(entry.providerId);
+
+    try {
+      const response = await adapter.chatCompletionStream(entry.model, request, signal);
+
+      logger.info(
+        {
+          provider: entry.providerId,
+          model: entry.model,
+          chain: chain.name,
+          attemptsCount: attempts.length + 1,
+        },
+        `Stream opened from ${entry.providerId}/${entry.model} (${attempts.length + 1} attempt(s))`,
+      );
+
+      return {
+        response,
+        providerId: entry.providerId,
+        model: entry.model,
+        attempts,
+      };
+    } catch (error: unknown) {
+      if (error instanceof ProviderRateLimitError) {
+        const retryAfterHeader = error.headers.get('retry-after');
+        let retryAfterMs: number | undefined;
+        if (retryAfterHeader) {
+          const seconds = parseInt(retryAfterHeader, 10);
+          if (!isNaN(seconds)) {
+            retryAfterMs = seconds * 1000;
+          }
+        }
+
+        tracker.markExhausted(
+          entry.providerId,
+          entry.model,
+          retryAfterMs,
+          '429 rate limited (streaming)',
+        );
+
+        logger.info(
+          { provider: entry.providerId, model: entry.model, chain: chain.name, retryAfterMs },
+          `Provider ${entry.providerId}/${entry.model} returned 429 [stream], waterfalling`,
+        );
+
+        attempts.push({
+          provider: entry.providerId,
+          model: entry.model,
+          error: '429_rate_limited',
+          retryAfter: retryAfterMs,
+        });
+        continue;
+      }
+
+      if (error instanceof ProviderError) {
+        logger.info(
+          { provider: entry.providerId, model: entry.model, chain: chain.name, statusCode: error.statusCode },
+          `Provider ${entry.providerId}/${entry.model} returned ${error.statusCode} [stream], waterfalling`,
+        );
+        attempts.push({
+          provider: entry.providerId,
+          model: entry.model,
+          error: `${error.statusCode}: ${error.message}`,
+        });
+        continue;
+      }
+
+      const errorMessage = error instanceof Error ? error.message : String(error);
+
+      // If this is an AbortError, the client disconnected -- don't waterfall, just throw
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw error;
+      }
+
+      logger.info(
+        { provider: entry.providerId, model: entry.model, chain: chain.name, error: errorMessage },
+        `Provider ${entry.providerId}/${entry.model} failed [stream]: ${errorMessage}, waterfalling`,
+      );
+      attempts.push({
+        provider: entry.providerId,
+        model: entry.model,
+        error: errorMessage,
+      });
+      continue;
+    }
+  }
+
+  logger.warn(
+    { chain: chain.name, totalAttempts: attempts.length, attempts },
+    `All providers exhausted in chain "${chain.name}" [stream]`,
   );
 
   throw new AllProvidersExhaustedError(chain.name, attempts);

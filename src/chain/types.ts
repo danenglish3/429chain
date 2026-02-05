@@ -38,6 +38,18 @@ export interface ChainResult {
   attempts: AttemptRecord[];
 }
 
+/** Result of a successful streaming chain execution (pre-stream phase). */
+export interface StreamChainResult {
+  /** Raw fetch Response with unconsumed ReadableStream body. */
+  response: Response;
+  /** The provider that opened the stream. */
+  providerId: string;
+  /** The model being streamed. */
+  model: string;
+  /** Record of all attempts made before finding a working provider. */
+  attempts: AttemptRecord[];
+}
+
 /**
  * Build runtime Chain objects from config and a provider registry.
  * Validates that each chain entry references a registered provider.

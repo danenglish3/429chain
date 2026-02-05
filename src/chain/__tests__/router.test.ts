@@ -60,6 +60,9 @@ function createSuccessAdapter(
         latencyMs: 50,
       } satisfies ProviderResponse;
     }),
+    chatCompletionStream: vi.fn(async () => {
+      return new Response('mock stream', { status: 200 });
+    }),
     parseRateLimitHeaders: vi.fn(() => rateLimitInfo),
     getExtraHeaders: () => ({}),
   };
@@ -82,6 +85,13 @@ function createRateLimitAdapter(
       }
       throw new ProviderRateLimitError(id, 'test-model', headers);
     }),
+    chatCompletionStream: vi.fn(async () => {
+      const headers = new Headers();
+      if (retryAfterSeconds !== undefined) {
+        headers.set('retry-after', String(retryAfterSeconds));
+      }
+      throw new ProviderRateLimitError(id, 'test-model', headers);
+    }),
     parseRateLimitHeaders: vi.fn(() => null),
     getExtraHeaders: () => ({}),
   };
@@ -97,6 +107,9 @@ function createServerErrorAdapter(id: string): ProviderAdapter {
     chatCompletion: vi.fn(async () => {
       throw new ProviderError(id, 'test-model', 500, 'Internal Server Error');
     }),
+    chatCompletionStream: vi.fn(async () => {
+      throw new ProviderError(id, 'test-model', 500, 'Internal Server Error');
+    }),
     parseRateLimitHeaders: vi.fn(() => null),
     getExtraHeaders: () => ({}),
   };
@@ -110,6 +123,9 @@ function createNetworkErrorAdapter(id: string): ProviderAdapter {
     name: `Test ${id}`,
     baseUrl: `https://${id}.example.com`,
     chatCompletion: vi.fn(async () => {
+      throw new Error('ECONNREFUSED: connection refused');
+    }),
+    chatCompletionStream: vi.fn(async () => {
       throw new Error('ECONNREFUSED: connection refused');
     }),
     parseRateLimitHeaders: vi.fn(() => null),
