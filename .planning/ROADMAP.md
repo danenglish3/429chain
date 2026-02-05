@@ -58,9 +58,9 @@ Plans:
 **Plans**: 3
 
 Plans:
-- [ ] 03-01: Rate limit header parser and state machine (AVAILABLE/TRACKING/EXHAUSTED)
-- [ ] 03-02: Proactive provider skipping in chain router
-- [ ] 03-03: Manual rate limit configuration and fallback logic
+- [ ] 03-01-PLAN.md -- Three-state rate limit tracker with quota tracking (TDD) (Wave 1)
+- [ ] 03-02-PLAN.md -- Proactive quota tracking in both chain routers (Wave 2)
+- [ ] 03-03-PLAN.md -- Manual rate limit config schema and fallback enforcement (Wave 2)
 
 ### Phase 4: Observability & Persistence
 **Goal**: Users can see what the proxy is doing -- which providers are being used, how many tokens are consumed, and current rate limit status
@@ -115,11 +115,11 @@ Plans:
 |-------|---------------|--------|-----------|
 | 1. Core Waterfall Proxy | 4/4 | Complete | 2026-02-05 |
 | 2. SSE Streaming | 2/2 | Complete | 2026-02-05 |
-| 3. Rate Limit Intelligence | 0/3 | Not started | - |
+| 3. Rate Limit Intelligence | 0/3 | Planned | - |
 | 4. Observability & Persistence | 0/3 | Not started | - |
 | 5. Web UI | 0/4 | Not started | - |
 | 6. Docker Deployment | 0/3 | Not started | - |
 
 ---
 *Roadmap created: 2026-02-05*
-*Last updated: 2026-02-05 after Phase 2 completion*
+*Last updated: 2026-02-05 after Phase 3 planning*
