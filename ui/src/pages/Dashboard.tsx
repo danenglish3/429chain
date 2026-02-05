@@ -1,9 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../lib/api.js';
 import { queryKeys } from '../lib/queryKeys.js';
-// import StatsCard from '../components/StatsCard.js'; // TODO: implement in plan 05-04
-// import RequestLog from '../components/RequestLog.js'; // TODO: implement in plan 05-04
-// import RateLimitStatus from '../components/RateLimitStatus.js'; // TODO: implement in plan 05-04
+import StatsCard from '../components/StatsCard.js';
+import RequestLog from '../components/RequestLog.js';
+import RateLimitStatus from '../components/RateLimitStatus.js';
 import styles from './Dashboard.module.css';
 
 interface ProviderUsage {
@@ -67,21 +67,22 @@ export default function Dashboard() {
 
         {!isLoading && !error && (providerStats.length > 0 || chainStats.length > 0) && (
           <div className={styles.statsGrid}>
-            {/* TODO: implement StatsCard in plan 05-04 */}
             {providerStats.map((provider: ProviderUsage) => (
-              <div key={provider.providerId}>
-                <strong>Provider: {provider.providerId}</strong>
-                <div>{formatNumber(provider.totalRequests)} requests</div>
-                <div>{formatNumber(provider.totalTokens)} tokens</div>
-              </div>
+              <StatsCard
+                key={provider.providerId}
+                title={`Provider: ${provider.providerId}`}
+                value={formatNumber(provider.totalRequests)}
+                subtitle={`${formatNumber(provider.totalTokens)} tokens`}
+              />
             ))}
 
             {chainStats.map((chain: ChainUsage) => (
-              <div key={chain.chainName}>
-                <strong>Chain: {chain.chainName}</strong>
-                <div>{formatNumber(chain.totalRequests)} requests</div>
-                <div>{formatNumber(chain.totalTokens)} tokens</div>
-              </div>
+              <StatsCard
+                key={chain.chainName}
+                title={`Chain: ${chain.chainName}`}
+                value={formatNumber(chain.totalRequests)}
+                subtitle={`${formatNumber(chain.totalTokens)} tokens`}
+              />
             ))}
           </div>
         )}
@@ -90,15 +91,13 @@ export default function Dashboard() {
       {/* Section 2: Request Log */}
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>Recent Requests</h2>
-        {/* TODO: implement RequestLog in plan 05-04 */}
-        <div>RequestLog component coming soon</div>
+        <RequestLog />
       </section>
 
       {/* Section 3: Rate Limit Status */}
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>Rate Limit Status</h2>
-        {/* TODO: implement RateLimitStatus in plan 05-04 */}
-        <div>RateLimitStatus component coming soon</div>
+        <RateLimitStatus />
       </section>
     </div>
   );

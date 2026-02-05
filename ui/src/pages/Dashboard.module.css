@@ -1,0 +1,54 @@
+.container {
+  padding: 24px;
+  max-width: 1400px;
+}
+
+.pageTitle {
+  font-size: 32px;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin: 0 0 32px 0;
+}
+
+.section {
+  margin-bottom: 40px;
+}
+
+.sectionTitle {
+  font-size: 20px;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin: 0 0 16px 0;
+}
+
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.loading {
+  padding: 20px;
+  text-align: center;
+  color: #666666;
+  font-size: 14px;
+}
+
+.error {
+  padding: 16px;
+  background-color: #fff3f3;
+  border: 1px solid #ffcccc;
+  border-radius: 8px;
+  color: #cc0000;
+  font-size: 14px;
+}
+
+.emptyState {
+  padding: 40px;
+  text-align: center;
+  color: #888888;
+  font-size: 14px;
+  background-color: #f9f9f9;
+  border-radius: 8px;
+  border: 1px dashed #dddddd;
+}
