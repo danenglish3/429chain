@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-02-05)
 ## Current Position
 
 Phase: 5 of 6 (Web UI)
-Plan: 3 of 6 in current phase -- COMPLETE
+Plan: 4 of 6 in current phase -- COMPLETE
 Status: In progress
-Last activity: 2026-02-06 -- Completed 05-03-PLAN.md
+Last activity: 2026-02-05 -- Completed 05-04-PLAN.md
 
-Progress: [################....] 80%
+Progress: [#################...] 85%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 16
-- Average duration: ~5.4 minutes
-- Total execution time: ~87 minutes
+- Total plans completed: 17
+- Average duration: ~5.5 minutes
+- Total execution time: ~93 minutes
 
 **By Phase:**
 
@@ -31,7 +31,7 @@ Progress: [################....] 80%
 | 2 - SSE Streaming | 2/2 | ~6min | ~3min |
 | 3 - Rate Limit Intelligence | 4/4 | ~14min | ~3.5min |
 | 4 - Observability & Persistence | 3/3 | ~17min | ~5.7min |
-| 5 - Web UI | 3/6 | ~26min | ~8.7min |
+| 5 - Web UI | 4/6 | ~32min | ~8min |
 
 ## Accumulated Context
 
@@ -91,6 +91,9 @@ Recent decisions affecting current work:
 - [d049] Query invalidation after mutations for automatic UI refresh
 - [d050] Show/hide toggle for sensitive input fields (API keys, passwords)
 - [d051] Server errors at form level, client validation errors at field level
+- [d052] Auto-save pattern: mutations fire immediately on user action, no explicit save button
+- [d053] Drag handle isolation: only handle triggers drag, not entire row
+- [d054] dnd-kit for drag-and-drop (DndContext + SortableContext + useSortable pattern)
 
 ### Pending Todos
 
@@ -102,8 +105,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-06
-Stopped at: Completed 05-03-PLAN.md (Provider Management UI)
+Last session: 2026-02-05
+Stopped at: Completed 05-04-PLAN.md (Chain Management with drag-and-drop)
 Resume file: None
 
 Config:
