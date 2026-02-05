@@ -55,12 +55,13 @@ Plans:
   1. After receiving a response with rate limit headers (x-ratelimit-remaining, x-ratelimit-reset), the proxy tracks remaining quota and skips the provider before it returns 429
   2. Users can manually configure rate limits per provider (RPM, daily token limits, concurrent request limits) as a fallback when headers are unavailable
   3. An exhausted provider is automatically skipped in the chain without making a request, and the next available provider is used instead
-**Plans**: 3
+**Plans**: 4
 
 Plans:
-- [ ] 03-01-PLAN.md -- Three-state rate limit tracker with quota tracking (TDD) (Wave 1)
-- [ ] 03-02-PLAN.md -- Proactive quota tracking in both chain routers (Wave 2)
-- [ ] 03-03-PLAN.md -- Manual rate limit config schema and fallback enforcement (Wave 2)
+- [x] 03-01-PLAN.md -- Three-state rate limit tracker with quota tracking (TDD) (Wave 1)
+- [x] 03-02-PLAN.md -- Proactive quota tracking in both chain routers (Wave 2)
+- [x] 03-03-PLAN.md -- Manual rate limit config schema and fallback enforcement (Wave 2)
+- [ ] 03-04-PLAN.md -- Gap closure: wire manual rate limit init into startup (Wave 1)
 
 ### Phase 4: Observability & Persistence
 **Goal**: Users can see what the proxy is doing -- which providers are being used, how many tokens are consumed, and current rate limit status
@@ -115,11 +116,11 @@ Plans:
 |-------|---------------|--------|-----------|
 | 1. Core Waterfall Proxy | 4/4 | Complete | 2026-02-05 |
 | 2. SSE Streaming | 2/2 | Complete | 2026-02-05 |
-| 3. Rate Limit Intelligence | 0/3 | Planned | - |
+| 3. Rate Limit Intelligence | 3/4 | Gap closure | - |
 | 4. Observability & Persistence | 0/3 | Not started | - |
 | 5. Web UI | 0/4 | Not started | - |
 | 6. Docker Deployment | 0/3 | Not started | - |
 
 ---
 *Roadmap created: 2026-02-05*
-*Last updated: 2026-02-05 after Phase 3 planning*
+*Last updated: 2026-02-05 after Phase 3 gap closure planning*
