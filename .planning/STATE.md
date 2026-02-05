@@ -5,29 +5,29 @@
 See: .planning/PROJECT.md (updated 2026-02-05)
 
 **Core value:** Requests never fail due to rate limits when free tokens exist somewhere in the chain
-**Current focus:** Phase 1: Core Waterfall Proxy
+**Current focus:** Phase 1 complete. Ready for Phase 2: SSE Streaming
 
 ## Current Position
 
-Phase: 1 of 6 (Core Waterfall Proxy)
-Plan: 3 of 4 in current phase
-Status: In progress
-Last activity: 2026-02-05 -- Completed 01-03-PLAN.md
+Phase: 1 of 6 (Core Waterfall Proxy) -- COMPLETE
+Plan: 4 of 4 in current phase
+Status: Phase complete
+Last activity: 2026-02-05 -- Completed 01-04-PLAN.md
 
-Progress: [##........] 10%
+Progress: [####................] 20%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 2
-- Average duration: ~6.5 minutes
-- Total execution time: ~13 minutes
+- Total plans completed: 4
+- Average duration: ~6.25 minutes
+- Total execution time: ~25 minutes
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 1 - Core Waterfall Proxy | 2/4 | ~13min | ~6.5min |
+| 1 - Core Waterfall Proxy | 4/4 | ~25min | ~6.25min |
 
 ## Accumulated Context
 
@@ -42,6 +42,9 @@ Recent decisions affecting current work:
 - [d004] Composite key ${providerId}:${model} for per-provider+model rate limit tracking
 - [d005] Timer.unref() on cooldown timers to prevent keeping process alive during shutdown
 - [d006] Race condition safety: isExhausted double-checks cooldownUntil timestamp
+- [d007] Route factory pattern: route creators take dependencies and return Hono sub-apps
+- [d008] Selective auth via Hono sub-app mounting: /health public, /v1/* protected
+- [d009] Model field as chain name hint: model field selects chain if name matches
 
 ### Pending Todos
 
@@ -54,5 +57,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-05
-Stopped at: Completed 01-03-PLAN.md
+Stopped at: Completed 01-04-PLAN.md (Phase 1 complete)
 Resume file: None
