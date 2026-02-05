@@ -101,9 +101,9 @@
 | CHAN-03 | Phase 1 | Complete |
 | RATE-01 | Phase 1 | Complete |
 | RATE-02 | Phase 1 | Complete |
-| RATE-03 | Phase 3 | Pending |
-| RATE-04 | Phase 3 | Pending |
-| RATE-05 | Phase 3 | Pending |
+| RATE-03 | Phase 3 | Complete |
+| RATE-04 | Phase 3 | Complete |
+| RATE-05 | Phase 3 | Complete |
 | OBSV-01 | Phase 4 | Pending |
 | OBSV-02 | Phase 4 | Pending |
 | OBSV-03 | Phase 4 | Pending |
@@ -123,4 +123,4 @@
 
 ---
 *Requirements defined: 2026-02-05*
-*Last updated: 2026-02-05 after Phase 2 completion*
+*Last updated: 2026-02-05 after Phase 3 completion*

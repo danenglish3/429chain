@@ -8,7 +8,7 @@
 
 - [x] **Phase 1: Core Waterfall Proxy** - Non-streaming OpenAI-compatible proxy with waterfall routing on 429
 - [x] **Phase 2: SSE Streaming** - Real-time streaming support for chat completions
-- [ ] **Phase 3: Rate Limit Intelligence** - Proactive header tracking and intelligent provider skipping
+- [x] **Phase 3: Rate Limit Intelligence** - Proactive header tracking and intelligent provider skipping
 - [ ] **Phase 4: Observability & Persistence** - Request logging, usage tracking, and stats aggregation
 - [ ] **Phase 5: Web UI** - Browser-based dashboard for provider/chain management and monitoring
 - [ ] **Phase 6: Docker Deployment** - Production-ready containerized deployment
@@ -61,7 +61,7 @@ Plans:
 - [x] 03-01-PLAN.md -- Three-state rate limit tracker with quota tracking (TDD) (Wave 1)
 - [x] 03-02-PLAN.md -- Proactive quota tracking in both chain routers (Wave 2)
 - [x] 03-03-PLAN.md -- Manual rate limit config schema and fallback enforcement (Wave 2)
-- [ ] 03-04-PLAN.md -- Gap closure: wire manual rate limit init into startup (Wave 1)
+- [x] 03-04-PLAN.md -- Gap closure: wire manual rate limit init into startup (Wave 1)
 
 ### Phase 4: Observability & Persistence
 **Goal**: Users can see what the proxy is doing -- which providers are being used, how many tokens are consumed, and current rate limit status
@@ -116,11 +116,11 @@ Plans:
 |-------|---------------|--------|-----------|
 | 1. Core Waterfall Proxy | 4/4 | Complete | 2026-02-05 |
 | 2. SSE Streaming | 2/2 | Complete | 2026-02-05 |
-| 3. Rate Limit Intelligence | 3/4 | Gap closure | - |
+| 3. Rate Limit Intelligence | 4/4 | Complete | 2026-02-05 |
 | 4. Observability & Persistence | 0/3 | Not started | - |
 | 5. Web UI | 0/4 | Not started | - |
 | 6. Docker Deployment | 0/3 | Not started | - |
 
 ---
 *Roadmap created: 2026-02-05*
-*Last updated: 2026-02-05 after Phase 3 gap closure planning*
+*Last updated: 2026-02-05 after Phase 3 completion (verified)*
