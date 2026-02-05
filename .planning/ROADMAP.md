@@ -87,13 +87,15 @@ Plans:
   2. A user can create and edit chains by adding, removing, and reordering provider+model pairs through the UI
   3. A user can view a usage dashboard showing per-provider totals, per-chain totals, a scrollable request log, and live rate limit status
   4. A user can send a test prompt from the UI and see which provider served it, the response content, and the latency
-**Plans**: 4
+**Plans**: 6 plans
 
 Plans:
-- [ ] 05-01: Admin API endpoints (CRUD for providers, chains, stats)
-- [ ] 05-02: React SPA scaffolding and provider management page
-- [ ] 05-03: Chain editor with drag-to-reorder and usage dashboard
-- [ ] 05-04: Test endpoint page and live rate limit status display
+- [ ] 05-01-PLAN.md -- Admin API endpoints: CRUD for providers and chains with config persistence (Wave 1)
+- [ ] 05-02-PLAN.md -- React SPA scaffold: Vite + React Router + TanStack Query + layout + API client + static serving (Wave 1)
+- [ ] 05-03-PLAN.md -- Provider management page: list, add/edit form with Zod validation, delete (Wave 2)
+- [ ] 05-04-PLAN.md -- Chain editor page: chain list, drag-and-drop reorder with dnd-kit, add/remove entries (Wave 2)
+- [ ] 05-05-PLAN.md -- Usage dashboard: stats cards, scrollable request log, live rate limit status (Wave 2)
+- [ ] 05-06-PLAN.md -- Test endpoint page: send prompt, view provider/response/latency + human verification (Wave 3)
 
 ### Phase 6: Docker Deployment
 **Goal**: Users can deploy the complete proxy with one command using Docker
@@ -118,9 +120,9 @@ Plans:
 | 2. SSE Streaming | 2/2 | Complete | 2026-02-05 |
 | 3. Rate Limit Intelligence | 4/4 | Complete | 2026-02-05 |
 | 4. Observability & Persistence | 3/3 | Complete | 2026-02-05 |
-| 5. Web UI | 0/4 | Not started | - |
+| 5. Web UI | 0/6 | Planned | - |
 | 6. Docker Deployment | 0/3 | Not started | - |
 
 ---
 *Roadmap created: 2026-02-05*
-*Last updated: 2026-02-06 after Phase 4 completion*
+*Last updated: 2026-02-06 after Phase 5 planning*
