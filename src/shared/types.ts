@@ -79,6 +79,31 @@ export interface ChatCompletionResponse {
   system_fingerprint?: string;
 }
 
+/** A single delta in a streaming chunk choice. */
+export interface ChatCompletionDelta {
+  role?: 'assistant';
+  content?: string | null;
+  tool_calls?: ToolCall[];
+}
+
+/** A single choice in a streaming chunk. */
+export interface ChatCompletionChunkChoice {
+  index: number;
+  delta: ChatCompletionDelta;
+  finish_reason: 'stop' | 'length' | 'tool_calls' | 'content_filter' | null;
+}
+
+/** OpenAI-compatible streaming chunk (one SSE event payload). */
+export interface ChatCompletionChunk {
+  id: string;
+  object: 'chat.completion.chunk';
+  created: number;
+  model: string;
+  choices: ChatCompletionChunkChoice[];
+  usage?: Usage | null;
+  system_fingerprint?: string;
+}
+
 /** OpenAI-compatible error response. */
 export interface OpenAIErrorResponse {
   error: {

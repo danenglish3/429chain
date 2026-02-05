@@ -67,6 +67,22 @@ export interface ProviderAdapter {
   ): Promise<ProviderResponse>;
 
   /**
+   * Send a streaming chat completion request.
+   * Returns the raw fetch Response so the caller can read the ReadableStream body.
+   * @param model - The model ID to request.
+   * @param body - The chat completion request body (model field is overridden).
+   * @param signal - Optional AbortSignal for request cancellation (critical for cleanup).
+   * @returns Raw fetch Response with body as ReadableStream of SSE chunks.
+   * @throws ProviderRateLimitError on 429 responses (before stream starts).
+   * @throws ProviderError on other non-OK responses.
+   */
+  chatCompletionStream(
+    model: string,
+    body: ChatCompletionRequest,
+    signal?: AbortSignal,
+  ): Promise<Response>;
+
+  /**
    * Parse rate limit information from the provider's response headers.
    * Each provider has its own header format; this normalizes them.
    * @param headers - Raw response headers from the provider.
