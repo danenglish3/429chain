@@ -22,6 +22,7 @@ import { RequestLogger } from './persistence/request-logger.js';
 import { UsageAggregator } from './persistence/aggregator.js';
 import { createStatsRoutes } from './api/routes/stats.js';
 import { createRateLimitRoutes } from './api/routes/ratelimits.js';
+import { createAdminRoutes } from './api/routes/admin.js';
 
 // --- Bootstrap ---
 
@@ -29,6 +30,9 @@ logger.info('429chain v0.1.0 starting...');
 
 const configPath = resolveConfigPath();
 const config = loadConfig(configPath);
+
+// Create mutable config reference for admin routes
+const configRef = { current: config };
 
 // Update logger level from config
 logger.level = config.settings.logLevel;
@@ -90,11 +94,19 @@ const chatRoutes = createChatRoutes(chains, tracker, registry, config.settings.d
 const modelsRoutes = createModelsRoutes(chains);
 const statsRoutes = createStatsRoutes(aggregator);
 const rateLimitRoutes = createRateLimitRoutes(tracker);
+const adminRoutes = createAdminRoutes({
+  configRef,
+  configPath,
+  registry,
+  chains,
+  tracker,
+});
 
 v1.route('/', chatRoutes);
 v1.route('/', modelsRoutes);
 v1.route('/stats', statsRoutes);
 v1.route('/ratelimits', rateLimitRoutes);
+v1.route('/admin', adminRoutes);
 
 app.route('/v1', v1);
 
