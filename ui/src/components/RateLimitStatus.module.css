@@ -1,0 +1,143 @@
+.container {
+  width: 100%;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 16px;
+}
+
+.card {
+  background-color: #ffffff;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.cardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.providerModel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+}
+
+.provider {
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.separator {
+  color: #cccccc;
+}
+
+.model {
+  color: #666666;
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+}
+
+.statusBadge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.statusAvailable {
+  background-color: #d4edda;
+  color: #155724;
+}
+
+.statusTracking {
+  background-color: #d1ecf1;
+  color: #0c5460;
+}
+
+.statusExhausted {
+  background-color: #f8d7da;
+  color: #721c24;
+}
+
+.cooldown {
+  padding: 8px 12px;
+  background-color: #fff3f3;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #333333;
+  margin-bottom: 8px;
+}
+
+.cooldownTimer {
+  font-family: 'Courier New', monospace;
+  font-weight: 600;
+  color: #cc0000;
+}
+
+.quota {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: #555555;
+}
+
+.quotaItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.quotaValue {
+  font-family: 'Courier New', monospace;
+  font-weight: 600;
+  color: #0066cc;
+}
+
+.reason {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background-color: #f9f9f9;
+  border-left: 3px solid #cc0000;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #666666;
+  font-style: italic;
+}
+
+.loading {
+  padding: 20px;
+  text-align: center;
+  color: #666666;
+  font-size: 14px;
+}
+
+.error {
+  padding: 16px;
+  background-color: #fff3f3;
+  border: 1px solid #ffcccc;
+  border-radius: 8px;
+  color: #cc0000;
+  font-size: 14px;
+}
+
+.empty {
+  padding: 40px;
+  text-align: center;
+  color: #888888;
+  font-size: 14px;
+  background-color: #f9f9f9;
+  border-radius: 8px;
+  border: 1px dashed #dddddd;
+}
