@@ -610,3 +610,58 @@ describe('Manual Rate Limits - Enforcement', () => {
     expect(tracker.isExhausted('groq', 'llama-3.1-8b')).toBe(false);
   });
 });
+
+describe('startup initialization pattern', () => {
+  it('registers manual limits for provider+model pairs found in chains', () => {
+    const tracker = new RateLimitTracker(60000);
+
+    // Simulate config.providers with rateLimits
+    const providers = [
+      { id: 'groq', rateLimits: { requestsPerMinute: 30 } },
+      { id: 'openrouter' }, // No rateLimits
+    ];
+
+    // Simulate config.chains
+    const chains = [
+      {
+        entries: [
+          { provider: 'groq', model: 'llama-3.3-70b' },
+          { provider: 'openrouter', model: 'gpt-4o' },
+        ],
+      },
+      {
+        entries: [
+          { provider: 'groq', model: 'gemma2-9b' },
+        ],
+      },
+    ];
+
+    // Replicate the initialization loop from index.ts
+    for (const provider of providers) {
+      if (!('rateLimits' in provider) || !provider.rateLimits) continue;
+
+      const models = new Set<string>();
+      for (const chain of chains) {
+        for (const entry of chain.entries) {
+          if (entry.provider === provider.id) {
+            models.add(entry.model);
+          }
+        }
+      }
+
+      for (const model of models) {
+        tracker.registerManualLimits(provider.id, model, provider.rateLimits);
+      }
+    }
+
+    // Verify: groq models have manual limits
+    expect(tracker.hasManualLimits('groq', 'llama-3.3-70b')).toBe(true);
+    expect(tracker.hasManualLimits('groq', 'gemma2-9b')).toBe(true);
+
+    // Verify: openrouter does NOT have manual limits (no rateLimits in config)
+    expect(tracker.hasManualLimits('openrouter', 'gpt-4o')).toBe(false);
+
+    // Verify: groq model NOT in any chain is not registered
+    expect(tracker.hasManualLimits('groq', 'nonexistent-model')).toBe(false);
+  });
+});
