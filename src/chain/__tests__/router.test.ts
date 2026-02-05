@@ -151,6 +151,12 @@ function createRegistry(adapters: ProviderAdapter[]): ProviderRegistry {
     get size(): number {
       return map.size;
     },
+    add(id: string, adapter: ProviderAdapter): void {
+      map.set(id, adapter);
+    },
+    remove(id: string): boolean {
+      return map.delete(id);
+    },
   };
 }
 

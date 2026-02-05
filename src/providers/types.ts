@@ -126,4 +126,18 @@ export interface ProviderRegistry {
    * Number of registered providers.
    */
   readonly size: number;
+
+  /**
+   * Add or replace a provider adapter in the registry.
+   * @param id - Provider ID to register
+   * @param adapter - The adapter instance
+   */
+  add(id: string, adapter: ProviderAdapter): void;
+
+  /**
+   * Remove a provider adapter from the registry.
+   * @param id - Provider ID to remove
+   * @returns true if the provider existed and was removed, false otherwise
+   */
+  remove(id: string): boolean;
 }

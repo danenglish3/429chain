@@ -49,6 +49,29 @@ export class ProviderRegistry implements IProviderRegistry {
   get size(): number {
     return this.adapters.size;
   }
+
+  /**
+   * Add or replace a provider adapter in the registry.
+   * @param id - Provider ID to register
+   * @param adapter - The adapter instance
+   */
+  add(id: string, adapter: ProviderAdapter): void {
+    this.adapters.set(id, adapter);
+    logger.info({ provider: id, type: adapter.providerType }, `Added provider to registry: ${adapter.name}`);
+  }
+
+  /**
+   * Remove a provider adapter from the registry.
+   * @param id - Provider ID to remove
+   * @returns true if the provider existed and was removed, false otherwise
+   */
+  remove(id: string): boolean {
+    const existed = this.adapters.delete(id);
+    if (existed) {
+      logger.info({ provider: id }, `Removed provider from registry`);
+    }
+    return existed;
+  }
 }
 
 /**
@@ -79,7 +102,7 @@ export function buildRegistry(providers: ProviderConfig[]): ProviderRegistry {
  * Create the correct adapter instance based on provider type.
  * @throws ConfigError if the type is unknown.
  */
-function createAdapter(config: ProviderConfig): ProviderAdapter {
+export function createAdapter(config: ProviderConfig): ProviderAdapter {
   switch (config.type) {
     case 'openrouter':
       return new OpenRouterAdapter(config.id, config.name, config.apiKey, config.baseUrl);
