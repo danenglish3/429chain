@@ -1,0 +1,233 @@
+.container {
+  max-width: 1200px;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.title {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 600;
+  color: #1a1a2e;
+}
+
+.addButton {
+  padding: 10px 20px;
+  background-color: #4f46e5;
+  border: none;
+  border-radius: 6px;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.addButton:hover {
+  background-color: #4338ca;
+}
+
+.formSection {
+  margin-bottom: 24px;
+}
+
+.loading,
+.error,
+.empty {
+  padding: 24px;
+  text-align: center;
+  background-color: #fff;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+}
+
+.error {
+  color: #dc2626;
+}
+
+.empty {
+  color: #6b7280;
+}
+
+.table {
+  width: 100%;
+  background-color: #fff;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  border-collapse: collapse;
+  overflow: hidden;
+}
+
+.table thead {
+  background-color: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.table th {
+  padding: 12px 16px;
+  text-align: left;
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.table tbody tr {
+  border-bottom: 1px solid #e5e7eb;
+  transition: background-color 0.15s;
+}
+
+.table tbody tr:last-child {
+  border-bottom: none;
+}
+
+.table tbody tr:nth-child(even) {
+  background-color: #f9fafb;
+}
+
+.table tbody tr:hover {
+  background-color: #f3f4f6;
+}
+
+.table td {
+  padding: 12px 16px;
+  font-size: 14px;
+  color: #1f2937;
+}
+
+.idCell {
+  font-family: monospace;
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.apiKeyCell {
+  font-family: monospace;
+  font-size: 13px;
+  color: #9ca3af;
+}
+
+.baseUrlCell {
+  font-size: 13px;
+  color: #6b7280;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.default {
+  color: #9ca3af;
+  font-style: italic;
+}
+
+.badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: capitalize;
+}
+
+.badgeopenrouter {
+  background-color: #dbeafe;
+  color: #1e40af;
+}
+
+.badgegroq {
+  background-color: #fce7f3;
+  color: #9f1239;
+}
+
+.badgecerebras {
+  background-color: #dcfce7;
+  color: #166534;
+}
+
+.badgegenericopenai {
+  background-color: #f3e8ff;
+  color: #6b21a8;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.deleteButton {
+  padding: 6px 12px;
+  background-color: transparent;
+  border: 1px solid #dc2626;
+  border-radius: 4px;
+  color: #dc2626;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.deleteButton:hover {
+  background-color: #fef2f2;
+}
+
+.deleteButtonConfirm {
+  padding: 6px 12px;
+  background-color: #dc2626;
+  border: none;
+  border-radius: 4px;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.deleteButtonConfirm:hover {
+  background-color: #b91c1c;
+}
+
+.deleteButtonConfirm:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.cancelButton {
+  padding: 6px 12px;
+  background-color: #f3f4f6;
+  border: none;
+  border-radius: 4px;
+  color: #374151;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.cancelButton:hover {
+  background-color: #e5e7eb;
+}
+
+.cancelButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.deleteError {
+  width: 100%;
+  padding: 8px;
+  margin-top: 8px;
+  background-color: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 4px;
+  color: #dc2626;
+  font-size: 12px;
+}

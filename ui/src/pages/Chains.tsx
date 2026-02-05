@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api.js';
 import { queryKeys } from '../lib/queryKeys.js';
-import ChainEditor from '../components/ChainEditor.js';
+// import ChainEditor from '../components/ChainEditor.js'; // TODO: implement in plan 05-05
 import styles from './Chains.module.css';
 
 interface Chain {
@@ -138,19 +138,20 @@ export default function Chains() {
   const defaultChain = config?.settings?.defaultChain || 'default';
 
   // If a chain is selected, show the editor
-  if (selectedChain) {
-    const chain = chains.find((c) => c.name === selectedChain);
-    if (chain) {
-      return (
-        <ChainEditor
-          chainName={chain.name}
-          entries={chain.entries}
-          providers={providers}
-          onClose={handleCloseEditor}
-        />
-      );
-    }
-  }
+  // TODO: implement ChainEditor in plan 05-05
+  // if (selectedChain) {
+  //   const chain = chains.find((c) => c.name === selectedChain);
+  //   if (chain) {
+  //     return (
+  //       <ChainEditor
+  //         chainName={chain.name}
+  //         entries={chain.entries}
+  //         providers={providers}
+  //         onClose={handleCloseEditor}
+  //       />
+  //     );
+  //   }
+  // }
 
   return (
     <div className={styles.container}>
