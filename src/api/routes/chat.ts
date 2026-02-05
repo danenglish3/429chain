@@ -10,10 +10,11 @@ import { logger } from '../../shared/logger.js';
 import { executeChain, executeStreamChain, resolveChain } from '../../chain/router.js';
 import { AllProvidersExhaustedError } from '../../shared/errors.js';
 import { createSSEParser } from '../../streaming/sse-parser.js';
+import { RequestLogger } from '../../persistence/request-logger.js';
 import type { Chain, StreamChainResult } from '../../chain/types.js';
 import type { RateLimitTracker } from '../../ratelimit/tracker.js';
 import type { ProviderRegistry } from '../../providers/types.js';
-import type { ChatCompletionRequest } from '../../shared/types.js';
+import type { ChatCompletionRequest, Usage } from '../../shared/types.js';
 
 /**
  * Create chat completion routes with injected dependencies.
@@ -21,6 +22,7 @@ import type { ChatCompletionRequest } from '../../shared/types.js';
  * @param tracker - Rate limit tracker instance.
  * @param registry - Provider adapter registry.
  * @param defaultChainName - Default chain name from config.
+ * @param requestLogger - Request logger for observability.
  * @returns Hono app with POST /chat/completions route.
  */
 export function createChatRoutes(
@@ -28,6 +30,7 @@ export function createChatRoutes(
   tracker: RateLimitTracker,
   registry: ProviderRegistry,
   defaultChainName: string,
+  requestLogger: RequestLogger,
 ) {
   const app = new Hono();
 
@@ -48,7 +51,12 @@ export function createChatRoutes(
     // Streaming branch
     if (body.stream) {
       // Strip model field (chain entry determines actual model)
+      // Inject stream_options to capture token usage in final chunk
       const { model: _model, ...streamBody } = body;
+      const streamRequest = {
+        ...streamBody,
+        stream_options: { include_usage: true },
+      } as unknown as ChatCompletionRequest;
 
       // Create AbortController for upstream cleanup
       const abortController = new AbortController();
@@ -63,7 +71,7 @@ export function createChatRoutes(
       try {
         streamResult = await executeStreamChain(
           chain,
-          streamBody as ChatCompletionRequest,
+          streamRequest,
           tracker,
           registry,
           abortController.signal,
@@ -90,6 +98,9 @@ export function createChatRoutes(
           abortController.abort();
         });
 
+        let capturedUsage: Usage | null = null;
+        const streamStart = performance.now();
+
         try {
           const reader = streamResult.response.body!.getReader();
           const decoder = new TextDecoder();
@@ -103,12 +114,44 @@ export function createChatRoutes(
             const result = parser.parse(chunk);
 
             for (const data of result.events) {
+              // Check if this chunk contains usage data (final chunk from OpenAI)
+              try {
+                const parsed = JSON.parse(data);
+                if (parsed.usage && typeof parsed.usage.total_tokens === 'number') {
+                  capturedUsage = parsed.usage as Usage;
+                }
+              } catch {
+                // Not JSON or doesn't have usage -- normal content chunk, continue
+              }
+
               await stream.writeSSE({ data });
             }
 
             if (result.done) {
               // Write the final [DONE] marker to the client
               await stream.writeSSE({ data: '[DONE]' });
+
+              // Fire-and-forget: log streaming request with captured usage
+              const streamLatencyMs = performance.now() - streamStart;
+              setImmediate(() => {
+                try {
+                  requestLogger.logRequest({
+                    timestamp: Date.now(),
+                    chainName: chain.name,
+                    providerId: streamResult.providerId,
+                    model: streamResult.model,
+                    promptTokens: capturedUsage?.prompt_tokens ?? 0,
+                    completionTokens: capturedUsage?.completion_tokens ?? 0,
+                    totalTokens: capturedUsage?.total_tokens ?? 0,
+                    latencyMs: streamLatencyMs,
+                    httpStatus: 200,
+                    attempts: streamResult.attempts.length + 1,
+                  });
+                } catch (error) {
+                  logger.error({ error }, 'Failed to log streaming request');
+                }
+              });
+
               break;
             }
           }
@@ -160,6 +203,26 @@ export function createChatRoutes(
     // Set informational headers
     c.header('X-429chain-Provider', `${result.providerId}/${result.model}`);
     c.header('X-429chain-Attempts', String(result.attempts.length + 1));
+
+    // Fire-and-forget: log request without blocking response
+    setImmediate(() => {
+      try {
+        requestLogger.logRequest({
+          timestamp: Date.now(),
+          chainName: chain.name,
+          providerId: result.providerId,
+          model: result.model,
+          promptTokens: result.response.usage.prompt_tokens,
+          completionTokens: result.response.usage.completion_tokens,
+          totalTokens: result.response.usage.total_tokens,
+          latencyMs: result.latencyMs,
+          httpStatus: 200,
+          attempts: result.attempts.length + 1,
+        });
+      } catch (error) {
+        logger.error({ error }, 'Failed to log request');
+      }
+    });
 
     return c.json(result.response);
   });
