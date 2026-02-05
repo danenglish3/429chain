@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { executeChain, resolveChain } from '../router.js';
+import { executeChain, executeStreamChain, resolveChain } from '../router.js';
 import { RateLimitTracker } from '../../ratelimit/tracker.js';
 import {
   AllProvidersExhaustedError,
@@ -573,6 +573,141 @@ describe('Proactive quota tracking (non-streaming)', () => {
     const status = tracker.getStatus('provider-a', 'model-1');
     expect(status.status).toBe('exhausted');
     expect(status.reason).toBe('proactive: remaining requests and tokens = 0');
+  });
+});
+
+describe('Proactive quota tracking (streaming)', () => {
+  let tracker: RateLimitTracker;
+
+  beforeEach(() => {
+    tracker = new RateLimitTracker(60_000);
+  });
+
+  afterEach(() => {
+    tracker.shutdown();
+  });
+
+  it('should call tracker.updateQuota on streaming response with rate limit headers', async () => {
+    const rateLimitInfo: RateLimitInfo = {
+      remainingRequests: 15,
+      resetRequestsMs: 6000,
+      remainingTokens: 2000,
+      resetTokensMs: 6000,
+    };
+
+    // Create adapter with custom stream response that has rate limit headers
+    const adapter: ProviderAdapter = {
+      id: 'provider-a',
+      providerType: 'test',
+      name: 'Test provider-a',
+      baseUrl: 'https://provider-a.example.com',
+      chatCompletion: vi.fn(),
+      chatCompletionStream: vi.fn(async () => {
+        return new Response('data: {"choices":[{"delta":{"content":"test"}}]}', {
+          status: 200,
+          headers: {
+            'x-ratelimit-remaining-requests': '15',
+            'x-ratelimit-reset-requests': '6s',
+            'x-ratelimit-remaining-tokens': '2000',
+            'x-ratelimit-reset-tokens': '6s',
+          },
+        });
+      }),
+      parseRateLimitHeaders: vi.fn(() => rateLimitInfo),
+      getExtraHeaders: () => ({}),
+    };
+
+    const registry = createRegistry([adapter]);
+
+    const chain: Chain = {
+      name: 'test-chain',
+      entries: [{ providerId: 'provider-a', model: 'model-1' }],
+    };
+
+    const updateQuotaSpy = vi.spyOn(tracker, 'updateQuota');
+
+    const result = await executeStreamChain(chain, makeRequest(), tracker, registry);
+
+    expect(result.providerId).toBe('provider-a');
+    expect(updateQuotaSpy).toHaveBeenCalledWith('provider-a', 'model-1', rateLimitInfo);
+    expect(adapter.parseRateLimitHeaders).toHaveBeenCalledTimes(1);
+  });
+
+  it('should mark provider exhausted when streaming response has remainingRequests === 0', async () => {
+    const rateLimitInfo: RateLimitInfo = {
+      remainingRequests: 0,
+      resetRequestsMs: 10000,
+      remainingTokens: 5000,
+      resetTokensMs: 10000,
+    };
+
+    const adapter: ProviderAdapter = {
+      id: 'provider-a',
+      providerType: 'test',
+      name: 'Test provider-a',
+      baseUrl: 'https://provider-a.example.com',
+      chatCompletion: vi.fn(),
+      chatCompletionStream: vi.fn(async () => {
+        return new Response('data: {"choices":[{"delta":{"content":"test"}}]}', {
+          status: 200,
+          headers: {
+            'x-ratelimit-remaining-requests': '0',
+            'x-ratelimit-reset-requests': '10s',
+          },
+        });
+      }),
+      parseRateLimitHeaders: vi.fn(() => rateLimitInfo),
+      getExtraHeaders: () => ({}),
+    };
+
+    const registry = createRegistry([adapter]);
+
+    const chain: Chain = {
+      name: 'test-chain',
+      entries: [{ providerId: 'provider-a', model: 'model-1' }],
+    };
+
+    // First stream succeeds but marks exhausted
+    const result = await executeStreamChain(chain, makeRequest(), tracker, registry);
+    expect(result.providerId).toBe('provider-a');
+
+    // Provider should now be exhausted
+    expect(tracker.isExhausted('provider-a', 'model-1')).toBe(true);
+    const status = tracker.getStatus('provider-a', 'model-1');
+    expect(status.status).toBe('exhausted');
+    expect(status.reason).toBe('proactive: remaining requests = 0');
+  });
+
+  it('should not call updateQuota when streaming response has no rate limit headers', async () => {
+    const adapter: ProviderAdapter = {
+      id: 'provider-a',
+      providerType: 'test',
+      name: 'Test provider-a',
+      baseUrl: 'https://provider-a.example.com',
+      chatCompletion: vi.fn(),
+      chatCompletionStream: vi.fn(async () => {
+        return new Response('data: {"choices":[{"delta":{"content":"test"}}]}', {
+          status: 200,
+          headers: {}, // No rate limit headers
+        });
+      }),
+      parseRateLimitHeaders: vi.fn(() => null),
+      getExtraHeaders: () => ({}),
+    };
+
+    const registry = createRegistry([adapter]);
+
+    const chain: Chain = {
+      name: 'test-chain',
+      entries: [{ providerId: 'provider-a', model: 'model-1' }],
+    };
+
+    const updateQuotaSpy = vi.spyOn(tracker, 'updateQuota');
+
+    const result = await executeStreamChain(chain, makeRequest(), tracker, registry);
+    expect(result.providerId).toBe('provider-a');
+    expect(updateQuotaSpy).not.toHaveBeenCalled();
+    expect(adapter.parseRateLimitHeaders).toHaveBeenCalledTimes(1);
   });
 });
 

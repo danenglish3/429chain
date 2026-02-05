@@ -224,6 +224,12 @@ export async function executeStreamChain(
     try {
       const response = await adapter.chatCompletionStream(entry.model, request, signal);
 
+      // Parse rate limit headers from streaming response (headers available before body consumed)
+      const rateLimitInfo = adapter.parseRateLimitHeaders(response.headers);
+      if (rateLimitInfo) {
+        tracker.updateQuota(entry.providerId, entry.model, rateLimitInfo);
+      }
+
       logger.info(
         {
           provider: entry.providerId,
