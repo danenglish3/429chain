@@ -9,7 +9,7 @@
 - [x] **Phase 1: Core Waterfall Proxy** - Non-streaming OpenAI-compatible proxy with waterfall routing on 429
 - [x] **Phase 2: SSE Streaming** - Real-time streaming support for chat completions
 - [x] **Phase 3: Rate Limit Intelligence** - Proactive header tracking and intelligent provider skipping
-- [ ] **Phase 4: Observability & Persistence** - Request logging, usage tracking, and stats aggregation
+- [x] **Phase 4: Observability & Persistence** - Request logging, usage tracking, and stats aggregation
 - [ ] **Phase 5: Web UI** - Browser-based dashboard for provider/chain management and monitoring
 - [ ] **Phase 6: Docker Deployment** - Production-ready containerized deployment
 
@@ -74,9 +74,9 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 04-01-PLAN.md -- SQLite persistence module: better-sqlite3, config schema, DB init, schema migration, RequestLogger, UsageAggregator
-- [ ] 04-02-PLAN.md -- Request logging wiring: DB bootstrap in index.ts, fire-and-forget logging in chat routes, streaming token capture
-- [ ] 04-03-PLAN.md -- Stats and rate limit status API endpoints: usage queries and live provider status
+- [x] 04-01-PLAN.md -- SQLite persistence module: better-sqlite3, config schema, DB init, schema migration, RequestLogger, UsageAggregator
+- [x] 04-02-PLAN.md -- Request logging wiring: DB bootstrap in index.ts, fire-and-forget logging in chat routes, streaming token capture
+- [x] 04-03-PLAN.md -- Stats and rate limit status API endpoints: usage queries and live provider status
 
 ### Phase 5: Web UI
 **Goal**: Users can manage providers, chains, and monitor usage through a browser-based dashboard without editing config files
@@ -117,7 +117,7 @@ Plans:
 | 1. Core Waterfall Proxy | 4/4 | Complete | 2026-02-05 |
 | 2. SSE Streaming | 2/2 | Complete | 2026-02-05 |
 | 3. Rate Limit Intelligence | 4/4 | Complete | 2026-02-05 |
-| 4. Observability & Persistence | 0/3 | In progress | - |
+| 4. Observability & Persistence | 3/3 | Complete | 2026-02-05 |
 | 5. Web UI | 0/4 | Not started | - |
 | 6. Docker Deployment | 0/3 | Not started | - |
 
