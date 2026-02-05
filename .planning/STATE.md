@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-02-05)
 ## Current Position
 
 Phase: 4 of 6 (Observability & Persistence)
-Plan: 1 of 4 in current phase
+Plan: 2 of 4 in current phase
 Status: In progress
-Last activity: 2026-02-05 -- Completed 04-01-PLAN.md (SQLite persistence foundation)
+Last activity: 2026-02-05 -- Completed 04-02-PLAN.md (Request logging integration)
 
-Progress: [###########.........] 60%
+Progress: [############........] 65%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 11
+- Total plans completed: 12
 - Average duration: ~4.6 minutes
-- Total execution time: ~51 minutes
+- Total execution time: ~57 minutes
 
 **By Phase:**
 
@@ -30,7 +30,7 @@ Progress: [###########.........] 60%
 | 1 - Core Waterfall Proxy | 4/4 | ~25min | ~6.25min |
 | 2 - SSE Streaming | 2/2 | ~6min | ~3min |
 | 3 - Rate Limit Intelligence | 4/4 | ~14min | ~3.5min |
-| 4 - Observability & Persistence | 1/4 | ~6.5min | ~6.5min |
+| 4 - Observability & Persistence | 2/4 | ~13min | ~6.5min |
 
 ## Accumulated Context
 
@@ -71,6 +71,10 @@ Recent decisions affecting current work:
 - [d030] Materialized aggregation tables with SQLite triggers (O(1) stats reads, no application-level aggregation)
 - [d031] Fire-and-forget request logging with no error propagation (observability never fails proxy requests)
 - [d032] Timestamp stored as INTEGER (Unix epoch ms for efficient sorting and time-range queries)
+- [d033] setImmediate for fire-and-forget logging (schedules logging for next event loop tick, zero impact on response latency)
+- [d034] stream_options.include_usage for streaming token capture (OpenAI-compatible providers send usage in final chunk)
+- [d035] Try-catch around logRequest with error logging (observability never fails proxy requests)
+- [d036] performance.now() for streaming latency measurement (monotonic high-resolution time, accurate for latency tracking)
 
 ### Pending Todos
 
@@ -82,8 +86,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-05T19:54:27Z
-Stopped at: Completed 04-01-PLAN.md (SQLite persistence foundation)
+Last session: 2026-02-05T20:05:18Z
+Stopped at: Completed 04-02-PLAN.md (Request logging integration)
 Resume file: None
 
 Config:
