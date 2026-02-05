@@ -94,6 +94,55 @@ export abstract class BaseAdapter implements ProviderAdapter {
   }
 
   /**
+   * Send a streaming chat completion request to the provider.
+   * Returns the raw Response with ReadableStream body for SSE parsing.
+   */
+  async chatCompletionStream(
+    model: string,
+    body: ChatCompletionRequest,
+    signal?: AbortSignal,
+  ): Promise<Response> {
+    const url = `${this.baseUrl}/chat/completions`;
+    const requestBody = this.prepareRequestBody(model, body);
+    requestBody.stream = true; // Override: force streaming
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${this.apiKey}`,
+      ...this.getExtraHeaders(),
+    };
+
+    logger.debug({ provider: this.id, model, url }, 'Starting streaming request');
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(requestBody),
+      signal,
+    });
+
+    if (response.status === 429) {
+      const responseBody = await response.text();
+      logger.warn(
+        { provider: this.id, model },
+        'Provider returned 429 rate limit (streaming)',
+      );
+      throw new ProviderRateLimitError(this.id, model, response.headers, responseBody);
+    }
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      logger.error(
+        { provider: this.id, model, status: response.status },
+        'Streaming request failed',
+      );
+      throw new ProviderError(this.id, model, response.status, errorText);
+    }
+
+    return response;
+  }
+
+  /**
    * Prepare the request body for the provider.
    * Default: merge model into body and force stream: false.
    * Adapters can override to strip unsupported parameters.
