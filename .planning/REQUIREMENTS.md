@@ -104,10 +104,10 @@
 | RATE-03 | Phase 3 | Complete |
 | RATE-04 | Phase 3 | Complete |
 | RATE-05 | Phase 3 | Complete |
-| OBSV-01 | Phase 4 | Pending |
-| OBSV-02 | Phase 4 | Pending |
-| OBSV-03 | Phase 4 | Pending |
-| OBSV-04 | Phase 4 | Pending |
+| OBSV-01 | Phase 4 | Complete |
+| OBSV-02 | Phase 4 | Complete |
+| OBSV-03 | Phase 4 | Complete |
+| OBSV-04 | Phase 4 | Complete |
 | WEBU-01 | Phase 5 | Pending |
 | WEBU-02 | Phase 5 | Pending |
 | WEBU-03 | Phase 5 | Pending |
@@ -123,4 +123,4 @@
 
 ---
 *Requirements defined: 2026-02-05*
-*Last updated: 2026-02-05 after Phase 3 completion*
+*Last updated: 2026-02-06 after Phase 4 completion*
