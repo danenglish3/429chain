@@ -5,29 +5,30 @@
 See: .planning/PROJECT.md (updated 2026-02-05)
 
 **Core value:** Requests never fail due to rate limits when free tokens exist somewhere in the chain
-**Current focus:** Phase 1 complete. Ready for Phase 2: SSE Streaming
+**Current focus:** Phase 2: SSE Streaming - streaming infrastructure complete
 
 ## Current Position
 
-Phase: 1 of 6 (Core Waterfall Proxy) -- COMPLETE
-Plan: 4 of 4 in current phase
-Status: Phase complete
-Last activity: 2026-02-05 -- Completed 01-04-PLAN.md
+Phase: 2 of 6 (SSE Streaming)
+Plan: 1 of 2 in current phase
+Status: In progress
+Last activity: 2026-02-05 -- Completed 02-01-PLAN.md
 
-Progress: [####................] 20%
+Progress: [#####...............] 25%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 4
-- Average duration: ~6.25 minutes
-- Total execution time: ~25 minutes
+- Total plans completed: 5
+- Average duration: ~5.6 minutes
+- Total execution time: ~28 minutes
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 1 - Core Waterfall Proxy | 4/4 | ~25min | ~6.25min |
+| 2 - SSE Streaming | 1/2 | ~3min | ~3min |
 
 ## Accumulated Context
 
@@ -45,6 +46,9 @@ Recent decisions affecting current work:
 - [d007] Route factory pattern: route creators take dependencies and return Hono sub-apps
 - [d008] Selective auth via Hono sub-app mounting: /health public, /v1/* protected
 - [d009] Model field as chain name hint: model field selects chain if name matches
+- [d010] chatCompletionStream returns raw Response (not ProviderResponse) for unconsumed ReadableStream
+- [d011] SSE parser factory pattern with stateful buffer encapsulation
+- [d012] prepareRequestBody called first, then stream:true override (preserves body prep logic)
 
 ### Pending Todos
 
@@ -57,5 +61,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-05
-Stopped at: Completed 01-04-PLAN.md (Phase 1 complete)
+Stopped at: Completed 02-01-PLAN.md (SSE streaming infrastructure)
 Resume file: None
