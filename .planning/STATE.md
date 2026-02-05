@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-02-05)
 
 **Core value:** Requests never fail due to rate limits when free tokens exist somewhere in the chain
-**Current focus:** Phase 4 complete - Observability & Persistence
+**Current focus:** Phase 5 - Web UI (in progress)
 
 ## Current Position
 
-Phase: 4 of 6 (Observability & Persistence) -- COMPLETE
-Plan: 3 of 3 in current phase
-Status: Phase complete
-Last activity: 2026-02-06 -- Completed Phase 4 (Observability & Persistence)
+Phase: 5 of 6 (Web UI)
+Plan: 1 of 3 in current phase -- COMPLETE
+Status: In progress
+Last activity: 2026-02-06 -- Completed 05-01-PLAN.md
 
-Progress: [##############......] 70%
+Progress: [###############.....] 74%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 13
-- Average duration: ~4.7 minutes
-- Total execution time: ~61 minutes
+- Total plans completed: 14
+- Average duration: ~4.6 minutes
+- Total execution time: ~69 minutes
 
 **By Phase:**
 
@@ -31,6 +31,7 @@ Progress: [##############......] 70%
 | 2 - SSE Streaming | 2/2 | ~6min | ~3min |
 | 3 - Rate Limit Intelligence | 4/4 | ~14min | ~3.5min |
 | 4 - Observability & Persistence | 3/3 | ~17min | ~5.7min |
+| 5 - Web UI | 1/3 | ~8min | ~8min |
 
 ## Accumulated Context
 
@@ -75,6 +76,12 @@ Recent decisions affecting current work:
 - [d034] stream_options.include_usage for streaming token capture (OpenAI-compatible providers send usage in final chunk)
 - [d035] Try-catch around logRequest with error logging (observability never fails proxy requests)
 - [d036] performance.now() for streaming latency measurement (monotonic high-resolution time, accurate for latency tracking)
+- [d037] Admin routes use configRef wrapper ({ current: Config }) for mutable shared state
+- [d038] writeConfig serializes to YAML with 2-space indent matching loader expectations
+- [d039] DELETE /providers/:id validates no chains reference the provider before deletion
+- [d040] DELETE /chains/:name prevents default chain deletion (referential integrity)
+- [d041] PUT endpoints validate with Zod, return 400 with prettified errors on validation failure
+- [d042] Provider apiKey masked as "***" in GET responses for security
 
 ### Pending Todos
 
@@ -87,7 +94,7 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-06
-Stopped at: Phase 4 complete (Observability & Persistence) - all 3 plans executed, verified
+Stopped at: Completed 05-01-PLAN.md (Admin CRUD API endpoints)
 Resume file: None
 
 Config:
