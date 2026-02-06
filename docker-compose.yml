@@ -1,0 +1,47 @@
+# 429chain Docker Compose Configuration
+# Single-command deployment with: docker compose up
+
+services:
+  proxy:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: 429chain:latest
+    container_name: 429chain-proxy
+    init: true  # Enable tini for proper PID 1 signal handling (graceful shutdown)
+    ports:
+      - "${PORT:-3429}:3429"  # Host port configurable via .env, container always listens on 3429
+    volumes:
+      # Named volume for SQLite database persistence (Docker-managed)
+      # Mounts the entire /app/data directory to preserve .db, .db-wal, and .db-shm files together
+      # Important: WAL mode requires directory mount, not individual file mount
+      - data:/app/data
+
+      # Bind mount for user configuration
+      # NOTE: Writable mount (no :ro flag) required for admin API config writes
+      # The admin API (PUT /v1/admin/providers, etc.) persists changes back to YAML file
+      - ./config/config.yaml:/app/config/config.yaml
+    environment:
+      - NODE_ENV=production
+      - CONFIG_PATH=/app/config/config.yaml
+    env_file:
+      # Optional .env file for environment overrides
+      # Set required: false to allow running without .env file
+      - path: ./.env
+        required: false
+    healthcheck:
+      # Health check using existing /health endpoint
+      # Validates that the proxy is responding and providers are initialized
+      test: ["CMD", "curl", "-f", "http://localhost:3429/health"]
+      interval: 30s      # Check every 30 seconds
+      timeout: 3s        # Fail if check takes longer than 3 seconds
+      retries: 3         # Mark unhealthy after 3 consecutive failures
+      start_period: 10s  # Allow 10 seconds for initialization before checks count
+    restart: unless-stopped  # Auto-restart on crash but not after explicit stop
+
+volumes:
+  # Named volume for database persistence
+  # Docker manages this volume - data survives container restarts and docker compose down
+  # Backup with: docker run --rm --volumes-from 429chain-proxy -v $(pwd):/backup busybox tar cvf /backup/data-backup.tar /app/data
+  data:
+    driver: local
