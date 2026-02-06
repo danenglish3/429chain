@@ -12,6 +12,7 @@
 - [x] **Phase 4: Observability & Persistence** - Request logging, usage tracking, and stats aggregation
 - [x] **Phase 5: Web UI** - Browser-based dashboard for provider/chain management and monitoring
 - [x] **Phase 6: Docker Deployment** - Production-ready containerized deployment
+- [ ] **Phase 7: CLI Support** - Run with CLI support (npx/global install)
 
 ## Phase Details
 
@@ -112,6 +113,24 @@ Plans:
 - [x] 06-02-PLAN.md -- docker-compose.yml with volumes, environment handling, and health check
 - [x] 06-03-PLAN.md -- End-to-end deployment validation and human verification
 
+### Phase 7: CLI Support
+**Goal**: Users can install and run 429chain as a CLI tool via npm/npx
+**Depends on**: Phase 6
+**Requirements**: DEPL-04
+**Success Criteria** (what must be TRUE):
+  1. A user can run `npx 429chain --help` and see usage instructions for all CLI flags
+  2. A user can run `npx 429chain --init` and get a starter config.yaml created in their current directory
+  3. A user can run `npx 429chain` with a config file and the proxy starts with UI accessible
+  4. CLI flags --config and --port override defaults correctly
+  5. Static UI assets load correctly when running as a globally installed CLI (not just from project root)
+  6. `npm pack` produces a tarball with all required files (dist/, ui/dist/, config/config.example.yaml)
+**Plans**: 3 plans
+
+Plans:
+- [ ] 07-01-PLAN.md -- CLI entry point (src/cli.ts) and package.json distribution config (Wave 1)
+- [ ] 07-02-PLAN.md -- import.meta.url static file paths and graceful missing-config handling (Wave 1)
+- [ ] 07-03-PLAN.md -- Build pipeline verification and end-to-end CLI validation (Wave 2)
+
 ## Progress
 
 | Phase | Plans Complete | Status | Completed |
@@ -122,7 +141,8 @@ Plans:
 | 4. Observability & Persistence | 3/3 | Complete | 2026-02-05 |
 | 5. Web UI | 6/6 | Complete | 2026-02-06 |
 | 6. Docker Deployment | 3/3 | Complete | 2026-02-06 |
+| 7. CLI Support | 0/3 | In progress | - |
 
 ---
 *Roadmap created: 2026-02-05*
-*Last updated: 2026-02-06 after Phase 6 completion*
+*Last updated: 2026-02-06 after Phase 7 planned*
