@@ -136,10 +136,12 @@ app.get('*', async (c, next) => {
 
 // --- Start server ---
 
+const port = process.env['PORT'] ? Number(process.env['PORT']) : config.settings.port;
+
 const server = serve(
   {
     fetch: app.fetch,
-    port: config.settings.port,
+    port,
   },
   (info) => {
     logger.info(
