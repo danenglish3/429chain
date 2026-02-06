@@ -4,7 +4,7 @@
  * and returns a fully typed Config object or throws a ConfigError.
  */
 
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { parse as parseYaml } from 'yaml';
 import { z } from 'zod';
 import { ConfigSchema } from './schema.js';
@@ -20,6 +20,15 @@ import type { Config } from './types.js';
  * @throws ConfigError if the file cannot be read or validation fails
  */
 export function loadConfig(path: string): Config {
+  if (!existsSync(path)) {
+    console.error(`\nConfig file not found: ${path}\n`);
+    console.error('To create a config file, run:');
+    console.error('  429chain --init\n');
+    console.error('Or specify a custom config path:');
+    console.error('  429chain --config /path/to/config.yaml\n');
+    process.exit(1);
+  }
+
   let raw: string;
   try {
     raw = readFileSync(path, 'utf-8');
