@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-02-05)
 ## Current Position
 
 Phase: 6 of 6 (Docker Deployment)
-Plan: 1 of 3 in current phase
+Plan: 2 of 3 in current phase
 Status: In progress
-Last activity: 2026-02-06 -- Completed 06-01-PLAN.md
+Last activity: 2026-02-06 -- Completed 06-02-PLAN.md
 
-Progress: [████████████████████░] 95%
+Progress: [████████████████████▓] 96%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 20
-- Average duration: ~5.4 minutes
-- Total execution time: ~107 minutes
+- Total plans completed: 21
+- Average duration: ~5.2 minutes
+- Total execution time: ~109 minutes
 
 **By Phase:**
 
@@ -32,7 +32,7 @@ Progress: [████████████████████░] 95%
 | 3 - Rate Limit Intelligence | 4/4 | ~14min | ~3.5min |
 | 4 - Observability & Persistence | 3/3 | ~17min | ~5.7min |
 | 5 - Web UI | 6/6 | ~45min | ~7.5min |
-| 6 - Docker Deployment | 1/3 | ~1min | ~1min |
+| 6 - Docker Deployment | 2/3 | ~3min | ~1.5min |
 
 ## Accumulated Context
 
@@ -95,6 +95,10 @@ Recent decisions affecting current work:
 - [d052] Auto-save pattern: mutations fire immediately on user action, no explicit save button
 - [d053] Drag handle isolation: only handle triggers drag, not entire row
 - [d054] dnd-kit for drag-and-drop (DndContext + SortableContext + useSortable pattern)
+- [d055] Config bind mount writable (no :ro) to support admin API config writes
+- [d056] Named volume for entire /app/data directory (not individual .db file) for SQLite WAL mode
+- [d057] Optional .env file (required: false) allows running without environment file
+- [d058] Only functional environment variables documented in .env.example
 
 ### Pending Todos
 
@@ -107,7 +111,7 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-06
-Stopped at: Completed 06-01-PLAN.md (Docker Build Configuration)
+Stopped at: Completed 06-02-PLAN.md (Docker Compose Orchestration)
 Resume file: None
 
 Config:
