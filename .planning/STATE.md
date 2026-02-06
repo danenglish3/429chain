@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-02-05)
 ## Current Position
 
 Phase: 7 of 7 (CLI Support)
-Plan: 0 of 0 in current phase
-Status: Not planned yet
-Last activity: 2026-02-06 -- Added Phase 7 (CLI Support)
+Plan: 1 of 1 in current phase
+Status: Phase complete
+Last activity: 2026-02-06 - Completed 07-01-PLAN.md
 
-Progress: [████████████████████░] 95%
+Progress: [█████████████████████] 100%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 22
-- Average duration: ~5.2 minutes
-- Total execution time: ~114 minutes
+- Total plans completed: 23
+- Average duration: ~5.0 minutes
+- Total execution time: ~115.4 minutes
 
 **By Phase:**
 
@@ -33,6 +33,7 @@ Progress: [████████████████████░] 95%
 | 4 - Observability & Persistence | 3/3 | ~17min | ~5.7min |
 | 5 - Web UI | 6/6 | ~45min | ~7.5min |
 | 6 - Docker Deployment | 3/3 | ~8min | ~2.7min |
+| 7 - CLI Support | 1/1 | ~1.4min | ~1.4min |
 
 ## Accumulated Context
 
@@ -100,6 +101,11 @@ Recent decisions affecting current work:
 - [d057] Optional .env file (required: false) allows running without environment file
 - [d058] Only functional environment variables documented in .env.example
 - [d059] Dockerfile CMD uses dist/index.mjs for ESM output (tsdown builds .mjs not .js)
+- [d060] parseArgs with strict:false allows unknown args to pass through without error
+- [d061] import.meta.url for CLI asset resolution (config.example.yaml location in packaged npm)
+- [d062] .gitattributes enforces LF line endings on dist/cli.mjs for cross-platform shebang compatibility
+- [d063] Split build scripts: build:backend (tsdown both entries) + build:ui (frontend) for explicit control
+- [d064] npm files whitelist includes dist/, ui/dist/, config/config.example.yaml for clean publishing
 
 ### Roadmap Evolution
 
@@ -115,8 +121,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-06
-Stopped at: Added Phase 7 (CLI Support)
+Last session: 2026-02-06T05:19:38Z
+Stopped at: Completed 07-01-PLAN.md (CLI Infrastructure)
 Resume file: None
 
 Config:
