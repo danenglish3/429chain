@@ -105,12 +105,12 @@ Plans:
   1. A user can run `docker compose up` with a config file and have the proxy, Web UI, and persistence all running
   2. After restarting the container, all configuration, logs, and usage data persist through volume mounts
   3. Docker health checks use the `/health` endpoint to report container status
-**Plans**: 3
+**Plans**: 3 plans
 
 Plans:
-- [ ] 06-01: Multi-stage Dockerfile and docker-compose configuration
-- [ ] 06-02: Volume mounts, environment variable handling, and health check integration
-- [ ] 06-03: End-to-end deployment validation and config examples
+- [ ] 06-01-PLAN.md -- Multi-stage Dockerfile and .dockerignore for production image build
+- [ ] 06-02-PLAN.md -- docker-compose.yml with volumes, environment handling, and health check
+- [ ] 06-03-PLAN.md -- End-to-end deployment validation and human verification
 
 ## Progress
 
@@ -125,4 +125,4 @@ Plans:
 
 ---
 *Roadmap created: 2026-02-05*
-*Last updated: 2026-02-06 after Phase 5 execution*
+*Last updated: 2026-02-06 after Phase 6 planning*
