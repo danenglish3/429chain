@@ -24,3 +24,9 @@ Thumbs.db
 
 # Coverage
 coverage/
+
+# Docker / Data
+data/
+*.db
+*.db-wal
+*.db-shm
