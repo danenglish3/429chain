@@ -1,0 +1,2 @@
+# Ensure CLI entry point has LF line endings for shebang compatibility
+dist/cli.mjs text eol=lf

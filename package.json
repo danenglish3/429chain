@@ -3,11 +3,22 @@
   "version": "0.1.0",
   "type": "module",
   "description": "OpenAI-compatible proxy that waterfalls requests through provider chains on rate limits",
-  "main": "dist/index.js",
+  "main": "dist/index.mjs",
+  "bin": {
+    "429chain": "dist/cli.mjs"
+  },
+  "files": [
+    "dist/",
+    "ui/dist/",
+    "config/config.example.yaml"
+  ],
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsdown src/index.ts --format esm --dts",
-    "start": "node dist/index.js",
+    "build": "npm run build:backend && npm run build:ui",
+    "build:backend": "tsdown src/cli.ts src/index.ts --format esm --dts",
+    "build:ui": "cd ui && npm run build",
+    "start": "node dist/index.mjs",
+    "prepublishOnly": "npm test && npm run build",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
@@ -20,7 +31,8 @@
     "proxy",
     "rate-limit",
     "waterfall",
-    "llm"
+    "llm",
+    "cli"
   ],
   "author": "",
   "license": "MIT",
