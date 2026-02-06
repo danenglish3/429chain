@@ -10,7 +10,7 @@
 - [x] **Phase 2: SSE Streaming** - Real-time streaming support for chat completions
 - [x] **Phase 3: Rate Limit Intelligence** - Proactive header tracking and intelligent provider skipping
 - [x] **Phase 4: Observability & Persistence** - Request logging, usage tracking, and stats aggregation
-- [ ] **Phase 5: Web UI** - Browser-based dashboard for provider/chain management and monitoring
+- [x] **Phase 5: Web UI** - Browser-based dashboard for provider/chain management and monitoring
 - [ ] **Phase 6: Docker Deployment** - Production-ready containerized deployment
 
 ## Phase Details
@@ -90,12 +90,12 @@ Plans:
 **Plans**: 6 plans
 
 Plans:
-- [ ] 05-01-PLAN.md -- Admin API endpoints: CRUD for providers and chains with config persistence (Wave 1)
-- [ ] 05-02-PLAN.md -- React SPA scaffold: Vite + React Router + TanStack Query + layout + API client + static serving (Wave 1)
-- [ ] 05-03-PLAN.md -- Provider management page: list, add/edit form with Zod validation, delete (Wave 2)
-- [ ] 05-04-PLAN.md -- Chain editor page: chain list, drag-and-drop reorder with dnd-kit, add/remove entries (Wave 2)
-- [ ] 05-05-PLAN.md -- Usage dashboard: stats cards, scrollable request log, live rate limit status (Wave 2)
-- [ ] 05-06-PLAN.md -- Test endpoint page: send prompt, view provider/response/latency + human verification (Wave 3)
+- [x] 05-01-PLAN.md -- Admin API endpoints: CRUD for providers and chains with config persistence (Wave 1)
+- [x] 05-02-PLAN.md -- React SPA scaffold: Vite + React Router + TanStack Query + layout + API client + static serving (Wave 1)
+- [x] 05-03-PLAN.md -- Provider management page: list, add/edit form with Zod validation, delete (Wave 2)
+- [x] 05-04-PLAN.md -- Chain editor page: chain list, drag-and-drop reorder with dnd-kit, add/remove entries (Wave 2)
+- [x] 05-05-PLAN.md -- Usage dashboard: stats cards, scrollable request log, live rate limit status (Wave 2)
+- [x] 05-06-PLAN.md -- Test endpoint page: send prompt, view provider/response/latency + human verification (Wave 3)
 
 ### Phase 6: Docker Deployment
 **Goal**: Users can deploy the complete proxy with one command using Docker
@@ -120,9 +120,9 @@ Plans:
 | 2. SSE Streaming | 2/2 | Complete | 2026-02-05 |
 | 3. Rate Limit Intelligence | 4/4 | Complete | 2026-02-05 |
 | 4. Observability & Persistence | 3/3 | Complete | 2026-02-05 |
-| 5. Web UI | 0/6 | Planned | - |
+| 5. Web UI | 6/6 | Complete | 2026-02-06 |
 | 6. Docker Deployment | 0/3 | Not started | - |
 
 ---
 *Roadmap created: 2026-02-05*
-*Last updated: 2026-02-06 after Phase 5 planning*
+*Last updated: 2026-02-06 after Phase 5 execution*
