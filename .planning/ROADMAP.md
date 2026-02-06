@@ -12,7 +12,7 @@
 - [x] **Phase 4: Observability & Persistence** - Request logging, usage tracking, and stats aggregation
 - [x] **Phase 5: Web UI** - Browser-based dashboard for provider/chain management and monitoring
 - [x] **Phase 6: Docker Deployment** - Production-ready containerized deployment
-- [ ] **Phase 7: CLI Support** - Run with CLI support (npx/global install)
+- [x] **Phase 7: CLI Support** - Run with CLI support (npx/global install)
 
 ## Phase Details
 
@@ -127,9 +127,9 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 07-01-PLAN.md -- CLI entry point (src/cli.ts) and package.json distribution config (Wave 1)
-- [ ] 07-02-PLAN.md -- import.meta.url static file paths and graceful missing-config handling (Wave 1)
-- [ ] 07-03-PLAN.md -- Build pipeline verification and end-to-end CLI validation (Wave 2)
+- [x] 07-01-PLAN.md -- CLI entry point (src/cli.ts) and package.json distribution config (Wave 1)
+- [x] 07-02-PLAN.md -- import.meta.url static file paths and graceful missing-config handling (Wave 1)
+- [x] 07-03-PLAN.md -- Build pipeline verification and end-to-end CLI validation (Wave 2)
 
 ## Progress
 
@@ -141,8 +141,8 @@ Plans:
 | 4. Observability & Persistence | 3/3 | Complete | 2026-02-05 |
 | 5. Web UI | 6/6 | Complete | 2026-02-06 |
 | 6. Docker Deployment | 3/3 | Complete | 2026-02-06 |
-| 7. CLI Support | 0/3 | In progress | - |
+| 7. CLI Support | 3/3 | Complete | 2026-02-06 |
 
 ---
 *Roadmap created: 2026-02-05*
-*Last updated: 2026-02-06 after Phase 7 planned*
+*Last updated: 2026-02-06 after Phase 7 complete*

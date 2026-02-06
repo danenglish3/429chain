@@ -52,7 +52,7 @@
 
 ### Deployment
 
-- **DEPL-04**: npm/CLI package -- install globally and run via `npx 429chain`
+- [x] **DEPL-04**: npm/CLI package -- install globally and run via `npx 429chain`
 
 ### Proxy Enhancements
 
@@ -115,6 +115,7 @@
 | DEPL-01 | Phase 1 | Complete |
 | DEPL-02 | Phase 6 | Complete |
 | DEPL-03 | Phase 1 | Complete |
+| DEPL-04 | Phase 7 | Complete |
 
 **Coverage:**
 - v1 requirements: 25 total
@@ -123,4 +124,4 @@
 
 ---
 *Requirements defined: 2026-02-05*
-*Last updated: 2026-02-06 after Phase 6 completion*
+*Last updated: 2026-02-06 after Phase 7 completion*
