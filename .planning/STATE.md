@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-05)
 
 **Core value:** Requests never fail due to rate limits when free tokens exist somewhere in the chain
-**Current focus:** Phase 6 complete - Docker deployment validated
+**Current focus:** Phase 7 added - CLI support
 
 ## Current Position
 
-Phase: 6 of 6 (Docker Deployment)
-Plan: 3 of 3 in current phase
-Status: Phase complete - ALL PHASES COMPLETE
-Last activity: 2026-02-06 -- Completed 06-03-PLAN.md
+Phase: 7 of 7 (CLI Support)
+Plan: 0 of 0 in current phase
+Status: Not planned yet
+Last activity: 2026-02-06 -- Added Phase 7 (CLI Support)
 
-Progress: [█████████████████████] 100%
+Progress: [████████████████████░] 95%
 
 ## Performance Metrics
 
@@ -101,6 +101,10 @@ Recent decisions affecting current work:
 - [d058] Only functional environment variables documented in .env.example
 - [d059] Dockerfile CMD uses dist/index.mjs for ESM output (tsdown builds .mjs not .js)
 
+### Roadmap Evolution
+
+- Phase 7 added: CLI support (run via npx/global install)
+
 ### Pending Todos
 
 None yet.
@@ -112,7 +116,7 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-06
-Stopped at: Completed 06-03-PLAN.md (End-to-End Deployment Validation) - ALL PHASES COMPLETE
+Stopped at: Added Phase 7 (CLI Support)
 Resume file: None
 
 Config:
