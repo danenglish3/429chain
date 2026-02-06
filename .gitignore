@@ -30,3 +30,9 @@ data/
 *.db
 *.db-wal
 *.db-shm
+
+# Claude Code
+.claude/
+
+# TypeScript build info
+*.tsbuildinfo
