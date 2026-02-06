@@ -2,17 +2,16 @@
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-02-05)
+See: .planning/PROJECT.md (updated 2026-02-06)
 
 **Core value:** Requests never fail due to rate limits when free tokens exist somewhere in the chain
-**Current focus:** All phases complete - milestone ready
+**Current focus:** v1.0 shipped. Planning next milestone.
 
 ## Current Position
 
-Phase: 7 of 7 (CLI Support)
-Plan: 3 of 3 in current phase
-Status: All phases complete
-Last activity: 2026-02-06 - Completed Phase 7 (CLI Support)
+Milestone: v1.0 MVP (shipped 2026-02-06)
+Status: Complete
+Last activity: 2026-02-06 - v1.0 milestone archived
 
 Progress: [█████████████████████] 100%
 
