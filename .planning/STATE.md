@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-02-05)
 
 **Core value:** Requests never fail due to rate limits when free tokens exist somewhere in the chain
-**Current focus:** Phase 5 complete - Web UI verified
+**Current focus:** Phase 6 complete - Docker deployment validated
 
 ## Current Position
 
 Phase: 6 of 6 (Docker Deployment)
-Plan: 2 of 3 in current phase
-Status: In progress
-Last activity: 2026-02-06 -- Completed 06-02-PLAN.md
+Plan: 3 of 3 in current phase
+Status: Phase complete - ALL PHASES COMPLETE
+Last activity: 2026-02-06 -- Completed 06-03-PLAN.md
 
-Progress: [████████████████████▓] 96%
+Progress: [█████████████████████] 100%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 21
+- Total plans completed: 22
 - Average duration: ~5.2 minutes
-- Total execution time: ~109 minutes
+- Total execution time: ~114 minutes
 
 **By Phase:**
 
@@ -32,7 +32,7 @@ Progress: [████████████████████▓] 96%
 | 3 - Rate Limit Intelligence | 4/4 | ~14min | ~3.5min |
 | 4 - Observability & Persistence | 3/3 | ~17min | ~5.7min |
 | 5 - Web UI | 6/6 | ~45min | ~7.5min |
-| 6 - Docker Deployment | 2/3 | ~3min | ~1.5min |
+| 6 - Docker Deployment | 3/3 | ~8min | ~2.7min |
 
 ## Accumulated Context
 
@@ -99,6 +99,7 @@ Recent decisions affecting current work:
 - [d056] Named volume for entire /app/data directory (not individual .db file) for SQLite WAL mode
 - [d057] Optional .env file (required: false) allows running without environment file
 - [d058] Only functional environment variables documented in .env.example
+- [d059] Dockerfile CMD uses dist/index.mjs for ESM output (tsdown builds .mjs not .js)
 
 ### Pending Todos
 
@@ -111,7 +112,7 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-06
-Stopped at: Completed 06-02-PLAN.md (Docker Compose Orchestration)
+Stopped at: Completed 06-03-PLAN.md (End-to-End Deployment Validation) - ALL PHASES COMPLETE
 Resume file: None
 
 Config:
