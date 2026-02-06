@@ -94,12 +94,12 @@ if (values.init) {
 }
 
 // Set environment variables for the application
-if (values.config) {
+if (values.config && typeof values.config === 'string') {
   process.env.CONFIG_PATH = values.config;
 }
-if (values.port) {
+if (values.port && typeof values.port === 'string') {
   process.env.PORT = values.port;
 }
 
 // Bootstrap the application
-await import('./index.mjs');
+await import('./index.js');

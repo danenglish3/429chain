@@ -7,6 +7,8 @@
 import { Hono } from 'hono';
 import { serve } from '@hono/node-server';
 import { serveStatic } from '@hono/node-server/serve-static';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 import { logger } from './shared/logger.js';
 import { loadConfig, resolveConfigPath } from './config/loader.js';
 import { buildRegistry } from './providers/registry.js';
@@ -28,6 +30,10 @@ import { createAdminRoutes } from './api/routes/admin.js';
 // --- Bootstrap ---
 
 logger.info('429chain v0.1.0 starting...');
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const UI_DIST_PATH = join(__dirname, '..', 'ui', 'dist');
 
 const configPath = resolveConfigPath();
 const config = loadConfig(configPath);
@@ -114,10 +120,10 @@ app.route('/v1', v1);
 // --- Serve frontend static assets ---
 
 // Serve static assets (JS, CSS, images from Vite build)
-app.use('/assets/*', serveStatic({ root: './ui/dist' }));
+app.use('/assets/*', serveStatic({ root: UI_DIST_PATH }));
 
 // Serve common static files
-app.use('/vite.svg', serveStatic({ path: './ui/dist/vite.svg' }));
+app.use('/vite.svg', serveStatic({ path: join(UI_DIST_PATH, 'vite.svg') }));
 
 // SPA fallback: serve index.html for all non-API routes
 app.get('*', async (c, next) => {
@@ -125,7 +131,7 @@ app.get('*', async (c, next) => {
   if (c.req.path.startsWith('/v1/') || c.req.path.startsWith('/health')) {
     return next();
   }
-  return serveStatic({ path: './ui/dist/index.html' })(c, next);
+  return serveStatic({ path: join(UI_DIST_PATH, 'index.html') })(c, next);
 });
 
 // --- Start server ---
