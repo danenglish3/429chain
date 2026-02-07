@@ -11,16 +11,16 @@ See: .planning/PROJECT.md (updated 2026-02-06)
 
 Milestone: v1.0 MVP (shipped 2026-02-06)
 Status: Complete
-Last activity: 2026-02-08 - Completed quick task 004: Provider adapter creation guide (docs/PROVIDERS.md)
+Last activity: 2026-02-08 - Completed quick task 005: Per-provider timeout configuration with waterfall
 
 Progress: [█████████████████████] 100%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 25
+- Total plans completed: 26
 - Average duration: ~5.0 minutes
-- Total execution time: ~124.4 minutes
+- Total execution time: ~131.4 minutes
 
 **By Phase:**
 
@@ -108,6 +108,9 @@ Recent decisions affecting current work:
 - [d065] import.meta.url for static file resolution: fileURLToPath + dirname + join for absolute paths in ESM
 - [d066] console.error for pre-logger errors: config-not-found errors use console.error before logger init
 - [d067] PORT env var override: process.env.PORT takes precedence over config.settings.port for CLI --port flag
+- [d068] Per-provider timeout overrides global requestTimeoutMs (adapter.timeout ?? globalTimeoutMs pattern)
+- [d069] Timeout waterfalls WITHOUT cooldown (transient error, not a rate limit - no markExhausted call)
+- [d070] TimeoutError check BEFORE AbortError in streaming (Node 20+ distinct error types from AbortSignal.timeout)
 
 ### Roadmap Evolution
 
@@ -130,11 +133,12 @@ None yet.
 | 002 | Fix float retry-after parsing and add 402 cooldown | 2026-02-08 | 74be681 | [002-verify-429-handling-providers](./quick/002-verify-429-handling-providers/) |
 | 003 | Adapter unit tests (40 tests for all adapters + BaseAdapter) | 2026-02-08 | e51c2ca | [003-adapter-unit-tests](./quick/003-adapter-unit-tests/) |
 | 004 | Provider adapter creation guide (docs/PROVIDERS.md) | 2026-02-08 | c65698f | [004-provider-adapter-creation-guides](./quick/004-provider-adapter-creation-guides/) |
+| 005 | Per-provider timeout with waterfall, no cooldown | 2026-02-08 | 1b91e1d | [005-per-provider-timeout-waterfall](./quick/005-per-provider-timeout-waterfall/) |
 
 ## Session Continuity
 
 Last session: 2026-02-08
-Stopped at: Completed quick task 004
+Stopped at: Completed quick task 005
 Resume file: None
 
 Config:
