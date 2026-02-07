@@ -18,8 +18,8 @@ const UNSUPPORTED_PARAMS: readonly (keyof ChatCompletionRequest)[] = [
 ];
 
 export class CerebrasAdapter extends BaseAdapter {
-  constructor(id: string, name: string, apiKey: string, baseUrl?: string) {
-    super(id, 'cerebras', name, apiKey, baseUrl ?? DEFAULT_BASE_URL);
+  constructor(id: string, name: string, apiKey: string, baseUrl?: string, timeout?: number) {
+    super(id, 'cerebras', name, apiKey, baseUrl ?? DEFAULT_BASE_URL, timeout);
   }
 
   /**

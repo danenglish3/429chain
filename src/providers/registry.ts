@@ -105,18 +105,18 @@ export function buildRegistry(providers: ProviderConfig[]): ProviderRegistry {
 export function createAdapter(config: ProviderConfig): ProviderAdapter {
   switch (config.type) {
     case 'openrouter':
-      return new OpenRouterAdapter(config.id, config.name, config.apiKey, config.baseUrl);
+      return new OpenRouterAdapter(config.id, config.name, config.apiKey, config.baseUrl, config.timeout);
     case 'groq':
-      return new GroqAdapter(config.id, config.name, config.apiKey, config.baseUrl);
+      return new GroqAdapter(config.id, config.name, config.apiKey, config.baseUrl, config.timeout);
     case 'cerebras':
-      return new CerebrasAdapter(config.id, config.name, config.apiKey, config.baseUrl);
+      return new CerebrasAdapter(config.id, config.name, config.apiKey, config.baseUrl, config.timeout);
     case 'generic-openai':
       if (!config.baseUrl) {
         throw new ConfigError(
           `Provider '${config.id}' (generic-openai) requires a baseUrl`,
         );
       }
-      return new GenericOpenAIAdapter(config.id, config.name, config.apiKey, config.baseUrl);
+      return new GenericOpenAIAdapter(config.id, config.name, config.apiKey, config.baseUrl, config.timeout);
     default:
       throw new ConfigError(
         `Unknown provider type '${config.type}' for provider '${config.id}'. ` +

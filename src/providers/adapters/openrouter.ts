@@ -10,8 +10,8 @@ import type { RateLimitInfo } from '../types.js';
 const DEFAULT_BASE_URL = 'https://openrouter.ai/api/v1';
 
 export class OpenRouterAdapter extends BaseAdapter {
-  constructor(id: string, name: string, apiKey: string, baseUrl?: string) {
-    super(id, 'openrouter', name, apiKey, baseUrl ?? DEFAULT_BASE_URL);
+  constructor(id: string, name: string, apiKey: string, baseUrl?: string, timeout?: number) {
+    super(id, 'openrouter', name, apiKey, baseUrl ?? DEFAULT_BASE_URL, timeout);
   }
 
   /**

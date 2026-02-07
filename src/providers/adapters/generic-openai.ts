@@ -8,8 +8,8 @@ import { BaseAdapter } from '../base-adapter.js';
 import type { RateLimitInfo } from '../types.js';
 
 export class GenericOpenAIAdapter extends BaseAdapter {
-  constructor(id: string, name: string, apiKey: string, baseUrl: string) {
-    super(id, 'generic-openai', name, apiKey, baseUrl);
+  constructor(id: string, name: string, apiKey: string, baseUrl: string, timeout?: number) {
+    super(id, 'generic-openai', name, apiKey, baseUrl, timeout);
   }
 
   /**

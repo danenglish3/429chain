@@ -15,6 +15,7 @@ export abstract class BaseAdapter implements ProviderAdapter {
   public readonly name: string;
   public readonly baseUrl: string;
   protected readonly apiKey: string;
+  public readonly timeout?: number;
 
   constructor(
     id: string,
@@ -22,12 +23,14 @@ export abstract class BaseAdapter implements ProviderAdapter {
     name: string,
     apiKey: string,
     baseUrl: string,
+    timeout?: number,
   ) {
     this.id = id;
     this.providerType = providerType;
     this.name = name;
     this.apiKey = apiKey;
     this.baseUrl = baseUrl;
+    this.timeout = timeout;
   }
 
   /**

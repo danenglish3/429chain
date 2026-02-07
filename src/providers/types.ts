@@ -50,6 +50,8 @@ export interface ProviderAdapter {
   readonly name: string;
   /** API base URL for this provider. */
   readonly baseUrl: string;
+  /** Per-provider request timeout in milliseconds. Undefined = use global default. */
+  readonly timeout?: number;
 
   /**
    * Send a non-streaming chat completion request.

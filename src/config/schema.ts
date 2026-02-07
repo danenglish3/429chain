@@ -21,6 +21,7 @@ export const ProviderSchema = z.object({
   type: z.enum(['openrouter', 'groq', 'cerebras', 'generic-openai']),
   apiKey: z.string().min(1, { message: 'Provider apiKey must not be empty' }),
   baseUrl: z.url({ message: 'Provider baseUrl must be a valid URL' }).optional(),
+  timeout: z.number().int().min(1000).optional(),
   rateLimits: RateLimitConfigSchema.optional(),
 });
 

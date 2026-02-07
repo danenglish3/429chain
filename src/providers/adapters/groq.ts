@@ -52,8 +52,8 @@ export function parseDurationToMs(str: string): number {
 }
 
 export class GroqAdapter extends BaseAdapter {
-  constructor(id: string, name: string, apiKey: string, baseUrl?: string) {
-    super(id, 'groq', name, apiKey, baseUrl ?? DEFAULT_BASE_URL);
+  constructor(id: string, name: string, apiKey: string, baseUrl?: string, timeout?: number) {
+    super(id, 'groq', name, apiKey, baseUrl ?? DEFAULT_BASE_URL, timeout);
   }
 
   /**

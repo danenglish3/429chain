@@ -8,7 +8,7 @@ settings:
   defaultChain: "default"
   logLevel: info
   cooldownDefaultMs: 60000       # Default cooldown on 429 (ms)
-  requestTimeoutMs: 30000        # Upstream request timeout (ms)
+  requestTimeoutMs: 30000        # Global default timeout for upstream requests (ms). Per-provider timeout overrides this.
 
 providers:
   - id: openrouter
@@ -22,6 +22,7 @@ providers:
     type: groq
     apiKey: "gsk_your-key-here"
     # baseUrl defaults to https://api.groq.com/openai/v1
+    timeout: 10000  # Per-provider timeout (ms). Falls back to settings.requestTimeoutMs if omitted
     # Optional: manual rate limits as fallback when provider headers unavailable
     rateLimits:
       requestsPerMinute: 30    # Groq free tier: 30 RPM
