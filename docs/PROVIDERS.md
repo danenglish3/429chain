@@ -59,6 +59,7 @@ Providers that work with `generic-openai`:
 - **Together AI**: `https://api.together.xyz/v1`
 - **Fireworks AI**: `https://api.fireworks.ai/inference/v1`
 - **DeepInfra**: `https://api.deepinfra.com/v1/openai`
+- **Moonshot AI**: `https://api.moonshot.ai/v1`
 - Any provider with a `/v1/chat/completions` endpoint following OpenAI's spec
 
 ## Full Path: Custom Adapter
@@ -325,6 +326,8 @@ export function createAdapter(config: ProviderConfig): ProviderAdapter {
       return new GroqAdapter(config.id, config.name, config.apiKey, config.baseUrl);
     case 'cerebras':
       return new CerebrasAdapter(config.id, config.name, config.apiKey, config.baseUrl);
+    case 'openai':
+      return new OpenAIAdapter(config.id, config.name, config.apiKey, config.baseUrl);
     case 'generic-openai':
       if (!config.baseUrl) {
         throw new ConfigError(
@@ -340,7 +343,7 @@ export function createAdapter(config: ProviderConfig): ProviderAdapter {
     default:
       throw new ConfigError(
         `Unknown provider type '${config.type}' for provider '${config.id}'. ` +
-        `Supported types: openrouter, groq, cerebras, generic-openai, acme`,
+        `Supported types: openrouter, groq, cerebras, openai, generic-openai, acme`,
       );
   }
 }
@@ -356,7 +359,7 @@ export const ProviderSchema = z.object({
   name: z.string().min(1, { message: 'Provider name must not be empty' }),
 
   // ADD YOUR TYPE HERE
-  type: z.enum(['openrouter', 'groq', 'cerebras', 'generic-openai', 'acme']),
+  type: z.enum(['openrouter', 'groq', 'cerebras', 'openai', 'generic-openai', 'acme']),
 
   apiKey: z.string().min(1, { message: 'Provider apiKey must not be empty' }),
   baseUrl: z.url({ message: 'Provider baseUrl must be a valid URL' }).optional(),
@@ -521,7 +524,7 @@ Use this checklist when adding a new provider adapter:
 - [ ] All tests passing (`npm test`)
 - [ ] Config YAML updated with new provider definition
 - [ ] Provider tested with actual API credentials
-- [ ] Error messages in `createAdapter()` default case updated to include new type
+- [ ] Error messages in `createAdapter()` default case updated to include new type (in both registry.ts and docs)
 
 ## Next Steps
 

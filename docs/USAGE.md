@@ -157,7 +157,7 @@ Provider definitions. Each provider represents an upstream LLM API.
 |-------|------|----------|-------------|
 | `id` | string | Yes | Unique provider identifier |
 | `name` | string | Yes | Display name |
-| `type` | enum | Yes | Provider adapter: `openrouter`, `groq`, `cerebras`, `generic-openai` |
+| `type` | enum | Yes | Provider adapter: `openrouter`, `groq`, `cerebras`, `openai`, `generic-openai` |
 | `apiKey` | string | Yes | Provider API key |
 | `baseUrl` | url | No | Override default base URL (required for `generic-openai` type) |
 | `rateLimits` | object | No | Manual rate limit fallback (see below) |
@@ -167,6 +167,7 @@ Provider definitions. Each provider represents an upstream LLM API.
 - `openrouter` - OpenRouter API (default baseUrl: https://openrouter.ai/api/v1)
 - `groq` - Groq API (default baseUrl: https://api.groq.com/openai/v1)
 - `cerebras` - Cerebras API (default baseUrl: https://api.cerebras.ai/v1)
+- `openai` - OpenAI API (default baseUrl: https://api.openai.com/v1)
 - `generic-openai` - Generic OpenAI-compatible API (requires `baseUrl`)
 
 **Rate Limits (optional):**
@@ -199,6 +200,12 @@ providers:
     rateLimits:
       requestsPerMinute: 30
       tokensPerMinute: 15000
+
+  - id: openai
+    name: OpenAI
+    type: openai
+    apiKey: "sk-your-openai-key-here"
+    # baseUrl defaults to https://api.openai.com/v1
 
   - id: custom-api
     name: Custom OpenAI API
@@ -310,6 +317,18 @@ providers:
     apiKey: "csk-your-key-here"
     # baseUrl defaults to https://api.cerebras.ai/v1
 
+  - id: openai
+    name: OpenAI
+    type: openai
+    apiKey: "sk-your-openai-key-here"
+    # baseUrl defaults to https://api.openai.com/v1
+
+  - id: moonshot
+    name: Moonshot
+    type: generic-openai
+    apiKey: "sk-your-moonshot-key-here"
+    baseUrl: "https://api.moonshot.ai/v1"
+
 chains:
   - name: default
     entries:
@@ -319,6 +338,10 @@ chains:
         model: "llama-3.1-8b-instant"
       - provider: cerebras
         model: "llama-3.1-8b"
+      - provider: openai        # paid fallback
+        model: "gpt-4o-mini"
+      - provider: moonshot       # paid fallback
+        model: "kimi-k2-0711-preview"
 
   - name: fast
     entries:

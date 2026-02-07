@@ -36,6 +36,18 @@ providers:
     apiKey: "csk-your-key-here"
     # baseUrl defaults to https://api.cerebras.ai/v1
 
+  - id: openai
+    name: OpenAI
+    type: openai
+    apiKey: "sk-your-openai-key-here"
+    # baseUrl defaults to https://api.openai.com/v1
+
+  - id: moonshot
+    name: Moonshot
+    type: generic-openai
+    apiKey: "sk-your-moonshot-key-here"
+    baseUrl: "https://api.moonshot.ai/v1"
+
 chains:
   - name: default
     entries:
@@ -45,6 +57,10 @@ chains:
         model: "llama-3.1-8b-instant"
       - provider: cerebras
         model: "llama-3.1-8b"
+      - provider: openai        # paid fallback
+        model: "gpt-4o-mini"
+      - provider: moonshot       # paid fallback
+        model: "kimi-k2-0711-preview"
 
   - name: fast
     entries:
