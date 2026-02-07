@@ -11,7 +11,7 @@ See: .planning/PROJECT.md (updated 2026-02-06)
 
 Milestone: v1.0 MVP (shipped 2026-02-06)
 Status: Complete
-Last activity: 2026-02-08 - Completed quick task 005: Per-provider timeout configuration with waterfall
+Last activity: 2026-02-08 - Completed quick task 006: Add OpenAI and Moonshot providers
 
 Progress: [█████████████████████] 100%
 
@@ -111,6 +111,9 @@ Recent decisions affecting current work:
 - [d068] Per-provider timeout overrides global requestTimeoutMs (adapter.timeout ?? globalTimeoutMs pattern)
 - [d069] Timeout waterfalls WITHOUT cooldown (transient error, not a rate limit - no markExhausted call)
 - [d070] TimeoutError check BEFORE AbortError in streaming (Node 20+ distinct error types from AbortSignal.timeout)
+- [d071] Extract parseDurationToMs to shared utils.ts for Groq and OpenAI rate limit parsing
+- [d072] OpenAI as first-class provider type vs generic-openai (Go duration parsing for 6 headers)
+- [d073] Moonshot as generic-openai example (fully compatible, no custom headers)
 
 ### Roadmap Evolution
 
@@ -134,11 +137,12 @@ None yet.
 | 003 | Adapter unit tests (40 tests for all adapters + BaseAdapter) | 2026-02-08 | e51c2ca | [003-adapter-unit-tests](./quick/003-adapter-unit-tests/) |
 | 004 | Provider adapter creation guide (docs/PROVIDERS.md) | 2026-02-08 | c65698f | [004-provider-adapter-creation-guides](./quick/004-provider-adapter-creation-guides/) |
 | 005 | Per-provider timeout with waterfall, no cooldown | 2026-02-08 | 1b91e1d | [005-per-provider-timeout-waterfall](./quick/005-per-provider-timeout-waterfall/) |
+| 006 | OpenAI provider + Moonshot generic-openai example | 2026-02-08 | c2e7307 | [006-add-openai-moonshot-providers](./quick/006-add-openai-moonshot-providers/) |
 
 ## Session Continuity
 
 Last session: 2026-02-08
-Stopped at: Completed quick task 005
+Stopped at: Completed quick task 006
 Resume file: None
 
 Config:
