@@ -1,6 +1,6 @@
 /**
- * Groq adapter.
- * Handles Groq-specific rate limit header parsing with dual request/token
+ * OpenAI adapter.
+ * Handles OpenAI-specific rate limit header parsing with dual request/token
  * tracking and duration string parsing for reset times.
  */
 
@@ -8,18 +8,15 @@ import { BaseAdapter } from '../base-adapter.js';
 import type { RateLimitInfo } from '../types.js';
 import { parseDurationToMs } from '../utils.js';
 
-const DEFAULT_BASE_URL = 'https://api.groq.com/openai/v1';
+const DEFAULT_BASE_URL = 'https://api.openai.com/v1';
 
-// Re-export for backward compatibility with existing imports
-export { parseDurationToMs } from '../utils.js';
-
-export class GroqAdapter extends BaseAdapter {
+export class OpenAIAdapter extends BaseAdapter {
   constructor(id: string, name: string, apiKey: string, baseUrl?: string, timeout?: number) {
-    super(id, 'groq', name, apiKey, baseUrl ?? DEFAULT_BASE_URL, timeout);
+    super(id, 'openai', name, apiKey, baseUrl ?? DEFAULT_BASE_URL, timeout);
   }
 
   /**
-   * Parse Groq rate limit headers.
+   * Parse OpenAI rate limit headers.
    *
    * Format:
    *   x-ratelimit-limit-requests       -> max requests (RPD)
@@ -91,4 +88,3 @@ export class GroqAdapter extends BaseAdapter {
     return info;
   }
 }
-

@@ -10,6 +10,7 @@ import type { ProviderAdapter, ProviderRegistry as IProviderRegistry } from './t
 import { OpenRouterAdapter } from './adapters/openrouter.js';
 import { GroqAdapter } from './adapters/groq.js';
 import { CerebrasAdapter } from './adapters/cerebras.js';
+import { OpenAIAdapter } from './adapters/openai.js';
 import { GenericOpenAIAdapter } from './adapters/generic-openai.js';
 
 /** Registry of provider adapters, keyed by provider ID. */
@@ -110,6 +111,8 @@ export function createAdapter(config: ProviderConfig): ProviderAdapter {
       return new GroqAdapter(config.id, config.name, config.apiKey, config.baseUrl, config.timeout);
     case 'cerebras':
       return new CerebrasAdapter(config.id, config.name, config.apiKey, config.baseUrl, config.timeout);
+    case 'openai':
+      return new OpenAIAdapter(config.id, config.name, config.apiKey, config.baseUrl, config.timeout);
     case 'generic-openai':
       if (!config.baseUrl) {
         throw new ConfigError(
@@ -120,7 +123,7 @@ export function createAdapter(config: ProviderConfig): ProviderAdapter {
     default:
       throw new ConfigError(
         `Unknown provider type '${config.type}' for provider '${config.id}'. ` +
-        `Supported types: openrouter, groq, cerebras, generic-openai`,
+        `Supported types: openrouter, groq, cerebras, openai, generic-openai`,
       );
   }
 }
