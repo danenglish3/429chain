@@ -393,6 +393,27 @@ describe('executeChain', () => {
     expect(tracker.isExhausted('provider-a', 'model-1')).toBe(true);
   });
 
+  it('should parse float retry-after values without truncation', async () => {
+    // Groq sends retry-after: 8.12
+    const adapter1 = createRateLimitAdapter('provider-a', 8.12);
+    const adapter2 = createSuccessAdapter('provider-b');
+    const registry = createRegistry([adapter1, adapter2]);
+
+    const chain: Chain = {
+      name: 'test-chain',
+      entries: [
+        { providerId: 'provider-a', model: 'model-1' },
+        { providerId: 'provider-b', model: 'model-2' },
+      ],
+    };
+
+    const result = await executeChain(chain, makeRequest(), tracker, registry);
+
+    expect(result.providerId).toBe('provider-b');
+    // 8.12 seconds = 8120ms, not 8000ms (which parseInt would give)
+    expect(result.attempts[0]!.retryAfter).toBeCloseTo(8120, 0);
+  });
+
   it('should handle a single-entry chain that succeeds', async () => {
     const adapter1 = createSuccessAdapter('provider-a');
     const registry = createRegistry([adapter1]);
@@ -751,6 +772,129 @@ describe('resolveChain', () => {
     expect(() => resolveChain(undefined, chains, 'missing-default')).toThrow(
       'Chain "missing-default" not found',
     );
+  });
+});
+
+describe('402 Payment Required handling', () => {
+  let tracker: RateLimitTracker;
+
+  beforeEach(() => {
+    tracker = new RateLimitTracker(60_000);
+  });
+
+  afterEach(() => {
+    tracker.shutdown();
+  });
+
+  it('should apply cooldown on 402 and waterfall to next provider', async () => {
+    // Create adapter that returns 402 (credit exhaustion)
+    const adapter402: ProviderAdapter = {
+      id: 'openrouter',
+      providerType: 'test',
+      name: 'Test openrouter',
+      baseUrl: 'https://openrouter.example.com',
+      chatCompletion: vi.fn(async () => {
+        throw new ProviderError('openrouter', 'test-model', 402, 'Payment Required: credits exhausted');
+      }),
+      chatCompletionStream: vi.fn(async () => {
+        throw new ProviderError('openrouter', 'test-model', 402, 'Payment Required: credits exhausted');
+      }),
+      parseRateLimitHeaders: vi.fn(() => null),
+      getExtraHeaders: () => ({}),
+    };
+    const adapter2 = createSuccessAdapter('provider-b');
+    const registry = createRegistry([adapter402, adapter2]);
+
+    const chain: Chain = {
+      name: 'test-chain',
+      entries: [
+        { providerId: 'openrouter', model: 'test-model' },
+        { providerId: 'provider-b', model: 'model-2' },
+      ],
+    };
+
+    const result = await executeChain(chain, makeRequest(), tracker, registry);
+
+    // Should waterfall to provider-b
+    expect(result.providerId).toBe('provider-b');
+    expect(result.attempts).toHaveLength(1);
+    expect(result.attempts[0]!.error).toContain('402');
+
+    // openrouter should now be on cooldown
+    expect(tracker.isExhausted('openrouter', 'test-model')).toBe(true);
+    const status = tracker.getStatus('openrouter', 'test-model');
+    expect(status.reason).toBe('402 payment required (credits exhausted)');
+  });
+
+  it('should apply cooldown on 402 in streaming path', async () => {
+    const adapter402: ProviderAdapter = {
+      id: 'openrouter',
+      providerType: 'test',
+      name: 'Test openrouter',
+      baseUrl: 'https://openrouter.example.com',
+      chatCompletion: vi.fn(),
+      chatCompletionStream: vi.fn(async () => {
+        throw new ProviderError('openrouter', 'test-model', 402, 'Payment Required: credits exhausted');
+      }),
+      parseRateLimitHeaders: vi.fn(() => null),
+      getExtraHeaders: () => ({}),
+    };
+    const adapter2 = createSuccessAdapter('provider-b');
+    const registry = createRegistry([adapter402, adapter2]);
+
+    const chain: Chain = {
+      name: 'test-chain',
+      entries: [
+        { providerId: 'openrouter', model: 'test-model' },
+        { providerId: 'provider-b', model: 'model-2' },
+      ],
+    };
+
+    const result = await executeStreamChain(chain, makeRequest(), tracker, registry);
+
+    expect(result.providerId).toBe('provider-b');
+    expect(tracker.isExhausted('openrouter', 'test-model')).toBe(true);
+    const status = tracker.getStatus('openrouter', 'test-model');
+    expect(status.reason).toBe('402 payment required (credits exhausted)');
+  });
+
+  it('should skip 402-cooled provider on subsequent requests', async () => {
+    const adapter402: ProviderAdapter = {
+      id: 'openrouter',
+      providerType: 'test',
+      name: 'Test openrouter',
+      baseUrl: 'https://openrouter.example.com',
+      chatCompletion: vi.fn(async () => {
+        throw new ProviderError('openrouter', 'test-model', 402, 'Payment Required');
+      }),
+      chatCompletionStream: vi.fn(),
+      parseRateLimitHeaders: vi.fn(() => null),
+      getExtraHeaders: () => ({}),
+    };
+    const adapter2 = createSuccessAdapter('provider-b');
+    const registry = createRegistry([adapter402, adapter2]);
+
+    const chain: Chain = {
+      name: 'test-chain',
+      entries: [
+        { providerId: 'openrouter', model: 'test-model' },
+        { providerId: 'provider-b', model: 'model-2' },
+      ],
+    };
+
+    // First request: 402 triggers cooldown, waterfalls to provider-b
+    await executeChain(chain, makeRequest(), tracker, registry);
+
+    // Second request: openrouter should be skipped entirely (on cooldown)
+    const result2 = await executeChain(chain, makeRequest(), tracker, registry);
+
+    expect(result2.providerId).toBe('provider-b');
+    expect(result2.attempts).toHaveLength(1);
+    expect(result2.attempts[0]!.skipped).toBe(true);
+    expect(result2.attempts[0]!.error).toBe('on_cooldown');
+
+    // chatCompletion should only have been called once (first request)
+    expect(adapter402.chatCompletion).toHaveBeenCalledTimes(1);
   });
 });
 
