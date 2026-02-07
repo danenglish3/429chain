@@ -11,7 +11,7 @@ See: .planning/PROJECT.md (updated 2026-02-06)
 
 Milestone: v1.0 MVP (shipped 2026-02-06)
 Status: Complete
-Last activity: 2026-02-06 - v1.0 milestone archived
+Last activity: 2026-02-07 - Completed quick task 001: Usage docs (CLI + API reference)
 
 Progress: [█████████████████████] 100%
 
@@ -121,6 +121,12 @@ None yet.
 ### Blockers/Concerns
 
 None yet.
+
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 001 | Usage docs for CLI and swagger-style API reference | 2026-02-07 | fd44832 | [001-usage-docs-cli-swagger](./quick/001-usage-docs-cli-swagger/) |
 
 ## Session Continuity
 
