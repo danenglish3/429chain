@@ -11,7 +11,7 @@ See: .planning/PROJECT.md (updated 2026-02-06)
 
 Milestone: v1.0 MVP (shipped 2026-02-06)
 Status: Complete
-Last activity: 2026-02-08 - Completed quick task 002: 429 handling fixes (float retry-after, 402 cooldown)
+Last activity: 2026-02-08 - Completed quick task 003: Adapter unit tests (40 tests covering all adapters + BaseAdapter)
 
 Progress: [█████████████████████] 100%
 
@@ -128,11 +128,12 @@ None yet.
 |---|-------------|------|--------|-----------|
 | 001 | Usage docs for CLI and swagger-style API reference | 2026-02-07 | fd44832 | [001-usage-docs-cli-swagger](./quick/001-usage-docs-cli-swagger/) |
 | 002 | Fix float retry-after parsing and add 402 cooldown | 2026-02-08 | 74be681 | [002-verify-429-handling-providers](./quick/002-verify-429-handling-providers/) |
+| 003 | Adapter unit tests (40 tests for all adapters + BaseAdapter) | 2026-02-08 | e51c2ca | [003-adapter-unit-tests](./quick/003-adapter-unit-tests/) |
 
 ## Session Continuity
 
 Last session: 2026-02-08
-Stopped at: Completed quick task 002
+Stopped at: Completed quick task 003
 Resume file: None
 
 Config:
