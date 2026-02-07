@@ -99,7 +99,7 @@ export async function executeChain(
         const retryAfterHeader = error.headers.get('retry-after');
         let retryAfterMs: number | undefined;
         if (retryAfterHeader) {
-          const seconds = parseInt(retryAfterHeader, 10);
+          const seconds = parseFloat(retryAfterHeader);
           if (!isNaN(seconds)) {
             retryAfterMs = seconds * 1000;
           }
@@ -133,7 +133,17 @@ export async function executeChain(
       }
 
       if (error instanceof ProviderError) {
-        // Non-429 provider error (5xx, etc.): waterfall to next
+        // 402 Payment Required: credit exhaustion — apply long cooldown
+        if (error.statusCode === 402) {
+          tracker.markExhausted(
+            entry.providerId,
+            entry.model,
+            300_000, // 5 minutes — credits won't recover quickly
+            '402 payment required (credits exhausted)',
+          );
+        }
+
+        // Non-429 provider error (5xx, 402, etc.): waterfall to next
         logger.info(
           {
             provider: entry.providerId,
@@ -256,7 +266,7 @@ export async function executeStreamChain(
         const retryAfterHeader = error.headers.get('retry-after');
         let retryAfterMs: number | undefined;
         if (retryAfterHeader) {
-          const seconds = parseInt(retryAfterHeader, 10);
+          const seconds = parseFloat(retryAfterHeader);
           if (!isNaN(seconds)) {
             retryAfterMs = seconds * 1000;
           }
@@ -284,6 +294,16 @@ export async function executeStreamChain(
       }
 
       if (error instanceof ProviderError) {
+        // 402 Payment Required: credit exhaustion — apply long cooldown
+        if (error.statusCode === 402) {
+          tracker.markExhausted(
+            entry.providerId,
+            entry.model,
+            300_000, // 5 minutes — credits won't recover quickly
+            '402 payment required (credits exhausted)',
+          );
+        }
+
         logger.info(
           { provider: entry.providerId, model: entry.model, chain: chain.name, statusCode: error.statusCode },
           `Provider ${entry.providerId}/${entry.model} returned ${error.statusCode} [stream], waterfalling`,
