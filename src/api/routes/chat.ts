@@ -23,6 +23,7 @@ import type { ChatCompletionRequest, Usage } from '../../shared/types.js';
  * @param registry - Provider adapter registry.
  * @param defaultChainName - Default chain name from config.
  * @param requestLogger - Request logger for observability.
+ * @param globalTimeoutMs - Global timeout in milliseconds for upstream requests.
  * @returns Hono app with POST /chat/completions route.
  */
 export function createChatRoutes(
@@ -31,6 +32,7 @@ export function createChatRoutes(
   registry: ProviderRegistry,
   defaultChainName: string,
   requestLogger: RequestLogger,
+  globalTimeoutMs: number,
 ) {
   const app = new Hono();
 
@@ -75,6 +77,7 @@ export function createChatRoutes(
           tracker,
           registry,
           abortController.signal,
+          globalTimeoutMs,
         );
       } catch (error) {
         if (error instanceof AllProvidersExhaustedError) {
@@ -198,6 +201,7 @@ export function createChatRoutes(
       cleanBody as ChatCompletionRequest,
       tracker,
       registry,
+      globalTimeoutMs,
     );
 
     // Set informational headers

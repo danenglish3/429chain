@@ -186,7 +186,7 @@ describe('executeChain', () => {
       ],
     };
 
-    const result = await executeChain(chain, makeRequest(), tracker, registry);
+    const result = await executeChain(chain, makeRequest(), tracker, registry, 30_000);
 
     expect(result.providerId).toBe('provider-a');
     expect(result.model).toBe('model-1');
@@ -209,7 +209,7 @@ describe('executeChain', () => {
       ],
     };
 
-    const result = await executeChain(chain, makeRequest(), tracker, registry);
+    const result = await executeChain(chain, makeRequest(), tracker, registry, 30_000);
 
     expect(result.providerId).toBe('provider-b');
     expect(result.model).toBe('model-2');
@@ -236,7 +236,7 @@ describe('executeChain', () => {
       ],
     };
 
-    const result = await executeChain(chain, makeRequest(), tracker, registry);
+    const result = await executeChain(chain, makeRequest(), tracker, registry, 30_000);
 
     expect(result.providerId).toBe('provider-b');
     expect(result.attempts).toHaveLength(1);
@@ -256,7 +256,7 @@ describe('executeChain', () => {
       ],
     };
 
-    const result = await executeChain(chain, makeRequest(), tracker, registry);
+    const result = await executeChain(chain, makeRequest(), tracker, registry, 30_000);
 
     expect(result.providerId).toBe('provider-b');
     expect(result.attempts).toHaveLength(1);
@@ -279,11 +279,11 @@ describe('executeChain', () => {
     };
 
     await expect(
-      executeChain(chain, makeRequest(), tracker, registry),
+      executeChain(chain, makeRequest(), tracker, registry, 30_000),
     ).rejects.toThrow(AllProvidersExhaustedError);
 
     try {
-      await executeChain(chain, makeRequest(), tracker, registry);
+      await executeChain(chain, makeRequest(), tracker, registry, 30_000);
     } catch (error) {
       const exhaustedError = error as AllProvidersExhaustedError;
       // All three providers should be in the attempts
@@ -306,7 +306,7 @@ describe('executeChain', () => {
     };
 
     try {
-      await executeChain(chain, makeRequest(), tracker, registry);
+      await executeChain(chain, makeRequest(), tracker, registry, 30_000);
       expect.fail('Should have thrown');
     } catch (error) {
       const exhaustedError = error as AllProvidersExhaustedError;
@@ -336,7 +336,7 @@ describe('executeChain', () => {
       ],
     };
 
-    const result = await executeChain(chain, makeRequest(), tracker, registry);
+    const result = await executeChain(chain, makeRequest(), tracker, registry, 30_000);
 
     expect(result.providerId).toBe('provider-b');
     expect(result.attempts).toHaveLength(1);
@@ -361,7 +361,7 @@ describe('executeChain', () => {
       entries: [{ providerId: 'provider-a', model: 'model-1' }],
     };
 
-    const result = await executeChain(chain, makeRequest(), tracker, registry);
+    const result = await executeChain(chain, makeRequest(), tracker, registry, 30_000);
 
     expect(result.providerId).toBe('provider-a');
     // After success, the provider should be proactively marked exhausted
@@ -385,7 +385,7 @@ describe('executeChain', () => {
       ],
     };
 
-    const result = await executeChain(chain, makeRequest(), tracker, registry);
+    const result = await executeChain(chain, makeRequest(), tracker, registry, 30_000);
 
     expect(result.providerId).toBe('provider-b');
     expect(result.attempts[0]!.retryAfter).toBeUndefined();
@@ -407,7 +407,7 @@ describe('executeChain', () => {
       ],
     };
 
-    const result = await executeChain(chain, makeRequest(), tracker, registry);
+    const result = await executeChain(chain, makeRequest(), tracker, registry, 30_000);
 
     expect(result.providerId).toBe('provider-b');
     // 8.12 seconds = 8120ms, not 8000ms (which parseInt would give)
@@ -423,7 +423,7 @@ describe('executeChain', () => {
       entries: [{ providerId: 'provider-a', model: 'model-1' }],
     };
 
-    const result = await executeChain(chain, makeRequest(), tracker, registry);
+    const result = await executeChain(chain, makeRequest(), tracker, registry, 30_000);
 
     expect(result.providerId).toBe('provider-a');
     expect(result.attempts).toHaveLength(0);
@@ -439,7 +439,7 @@ describe('executeChain', () => {
     };
 
     await expect(
-      executeChain(chain, makeRequest(), tracker, registry),
+      executeChain(chain, makeRequest(), tracker, registry, 30_000),
     ).rejects.toThrow(AllProvidersExhaustedError);
   });
 
@@ -461,7 +461,7 @@ describe('executeChain', () => {
     };
 
     try {
-      await executeChain(chain, makeRequest(), tracker, registry);
+      await executeChain(chain, makeRequest(), tracker, registry, 30_000);
       expect.fail('Should have thrown');
     } catch (error) {
       const exhaustedError = error as AllProvidersExhaustedError;
@@ -502,7 +502,7 @@ describe('Proactive quota tracking (non-streaming)', () => {
     // Spy on updateQuota
     const updateQuotaSpy = vi.spyOn(tracker, 'updateQuota');
 
-    const result = await executeChain(chain, makeRequest(), tracker, registry);
+    const result = await executeChain(chain, makeRequest(), tracker, registry, 30_000);
 
     expect(result.providerId).toBe('provider-a');
     expect(updateQuotaSpy).toHaveBeenCalledWith('provider-a', 'model-1', rateLimitInfo);
@@ -525,7 +525,7 @@ describe('Proactive quota tracking (non-streaming)', () => {
     };
 
     // First request succeeds but marks exhausted
-    const result = await executeChain(chain, makeRequest(), tracker, registry);
+    const result = await executeChain(chain, makeRequest(), tracker, registry, 30_000);
     expect(result.providerId).toBe('provider-a');
 
     // Provider should now be exhausted on next call
@@ -550,7 +550,7 @@ describe('Proactive quota tracking (non-streaming)', () => {
       entries: [{ providerId: 'provider-a', model: 'model-1' }],
     };
 
-    const result = await executeChain(chain, makeRequest(), tracker, registry);
+    const result = await executeChain(chain, makeRequest(), tracker, registry, 30_000);
     expect(result.providerId).toBe('provider-a');
 
     // Provider should NOT be exhausted
@@ -572,7 +572,7 @@ describe('Proactive quota tracking (non-streaming)', () => {
 
     const updateQuotaSpy = vi.spyOn(tracker, 'updateQuota');
 
-    const result = await executeChain(chain, makeRequest(), tracker, registry);
+    const result = await executeChain(chain, makeRequest(), tracker, registry, 30_000);
     expect(result.providerId).toBe('provider-a');
     expect(updateQuotaSpy).not.toHaveBeenCalled();
     expect(adapter.parseRateLimitHeaders).toHaveBeenCalledTimes(1);
@@ -593,7 +593,7 @@ describe('Proactive quota tracking (non-streaming)', () => {
       entries: [{ providerId: 'provider-a', model: 'model-1' }],
     };
 
-    const result = await executeChain(chain, makeRequest(), tracker, registry);
+    const result = await executeChain(chain, makeRequest(), tracker, registry, 30_000);
     expect(result.providerId).toBe('provider-a');
 
     expect(tracker.isExhausted('provider-a', 'model-1')).toBe(true);
@@ -813,7 +813,7 @@ describe('402 Payment Required handling', () => {
       ],
     };
 
-    const result = await executeChain(chain, makeRequest(), tracker, registry);
+    const result = await executeChain(chain, makeRequest(), tracker, registry, 30_000);
 
     // Should waterfall to provider-b
     expect(result.providerId).toBe('provider-b');
@@ -883,10 +883,10 @@ describe('402 Payment Required handling', () => {
     };
 
     // First request: 402 triggers cooldown, waterfalls to provider-b
-    await executeChain(chain, makeRequest(), tracker, registry);
+    await executeChain(chain, makeRequest(), tracker, registry, 30_000);
 
     // Second request: openrouter should be skipped entirely (on cooldown)
-    const result2 = await executeChain(chain, makeRequest(), tracker, registry);
+    const result2 = await executeChain(chain, makeRequest(), tracker, registry, 30_000);
 
     expect(result2.providerId).toBe('provider-b');
     expect(result2.attempts).toHaveLength(1);
@@ -927,7 +927,7 @@ describe('Manual rate limit fallback', () => {
     // Spy on recordRequest
     const recordRequestSpy = vi.spyOn(tracker, 'recordRequest');
 
-    const result = await executeChain(chain, makeRequest(), tracker, registry);
+    const result = await executeChain(chain, makeRequest(), tracker, registry, 30_000);
 
     expect(result.providerId).toBe('provider-a');
     expect(recordRequestSpy).toHaveBeenCalledWith('provider-a', 'model-1');
@@ -947,7 +947,7 @@ describe('Manual rate limit fallback', () => {
 
     const recordRequestSpy = vi.spyOn(tracker, 'recordRequest');
 
-    const result = await executeChain(chain, makeRequest(), tracker, registry);
+    const result = await executeChain(chain, makeRequest(), tracker, registry, 30_000);
 
     expect(result.providerId).toBe('provider-a');
     expect(recordRequestSpy).not.toHaveBeenCalled();
@@ -974,7 +974,7 @@ describe('Manual rate limit fallback', () => {
     const recordRequestSpy = vi.spyOn(tracker, 'recordRequest');
     const updateQuotaSpy = vi.spyOn(tracker, 'updateQuota');
 
-    const result = await executeChain(chain, makeRequest(), tracker, registry);
+    const result = await executeChain(chain, makeRequest(), tracker, registry, 30_000);
 
     expect(result.providerId).toBe('provider-a');
     expect(updateQuotaSpy).toHaveBeenCalledWith('provider-a', 'model-1', rateLimitInfo);
@@ -1036,7 +1036,7 @@ describe('Manual rate limit fallback', () => {
 
     // First 3 requests should succeed
     for (let i = 0; i < 3; i++) {
-      const result = await executeChain(chain, makeRequest(), tracker, registry);
+      const result = await executeChain(chain, makeRequest(), tracker, registry, 30_000);
       expect(result.providerId).toBe('provider-a');
     }
 
@@ -1047,7 +1047,137 @@ describe('Manual rate limit fallback', () => {
 
     // Next request should throw AllProvidersExhaustedError
     await expect(
-      executeChain(chain, makeRequest(), tracker, registry),
+      executeChain(chain, makeRequest(), tracker, registry, 30_000),
     ).rejects.toThrow(AllProvidersExhaustedError);
+  });
+});
+
+describe('Timeout waterfall', () => {
+  let tracker: RateLimitTracker;
+
+  beforeEach(() => {
+    tracker = new RateLimitTracker(60_000);
+  });
+
+  afterEach(() => {
+    tracker.shutdown();
+  });
+
+  /** Helper to create an adapter that throws TimeoutError */
+  function createTimeoutAdapter(id: string, timeout?: number): ProviderAdapter {
+    return {
+      id,
+      providerType: 'test',
+      name: `Test ${id}`,
+      baseUrl: `https://${id}.example.com`,
+      timeout,
+      chatCompletion: vi.fn(async (_model: string, _body: unknown, _signal?: AbortSignal) => {
+        // Simulate a timeout error (same as AbortSignal.timeout throws)
+        const err = new DOMException('The operation was aborted due to timeout', 'TimeoutError');
+        throw err;
+      }),
+      chatCompletionStream: vi.fn(async (_model: string, _body: unknown, _signal?: AbortSignal) => {
+        const err = new DOMException('The operation was aborted due to timeout', 'TimeoutError');
+        throw err;
+      }),
+      parseRateLimitHeaders: vi.fn(() => null),
+      getExtraHeaders: () => ({}),
+    };
+  }
+
+  it('should waterfall to next provider on timeout WITHOUT applying cooldown', async () => {
+    const timeoutAdapter = createTimeoutAdapter('provider-a');
+    const successAdapter = createSuccessAdapter('provider-b');
+    const registry = createRegistry([timeoutAdapter, successAdapter]);
+
+    const chain: Chain = {
+      name: 'test-chain',
+      entries: [
+        { providerId: 'provider-a', model: 'model-1' },
+        { providerId: 'provider-b', model: 'model-2' },
+      ],
+    };
+
+    const result = await executeChain(chain, makeRequest(), tracker, registry, 30_000);
+
+    // Should waterfall to provider-b
+    expect(result.providerId).toBe('provider-b');
+    expect(result.model).toBe('model-2');
+
+    // Attempt record should show timeout
+    expect(result.attempts).toHaveLength(1);
+    expect(result.attempts[0]!.provider).toBe('provider-a');
+    expect(result.attempts[0]!.error).toBe('timeout_30000ms');
+
+    // NO cooldown should be applied to provider-a
+    expect(tracker.isExhausted('provider-a', 'model-1')).toBe(false);
+  });
+
+  it('should waterfall on timeout in streaming path WITHOUT cooldown', async () => {
+    const timeoutAdapter = createTimeoutAdapter('provider-a');
+    const successAdapter = createSuccessAdapter('provider-b');
+    const registry = createRegistry([timeoutAdapter, successAdapter]);
+
+    const chain: Chain = {
+      name: 'test-chain',
+      entries: [
+        { providerId: 'provider-a', model: 'model-1' },
+        { providerId: 'provider-b', model: 'model-2' },
+      ],
+    };
+
+    const result = await executeStreamChain(chain, makeRequest(), tracker, registry, undefined, 30_000);
+
+    // Should waterfall to provider-b
+    expect(result.providerId).toBe('provider-b');
+
+    // Attempt record should show timeout
+    expect(result.attempts).toHaveLength(1);
+    expect(result.attempts[0]!.error).toBe('timeout_30000ms');
+
+    // NO cooldown should be applied
+    expect(tracker.isExhausted('provider-a', 'model-1')).toBe(false);
+  });
+
+  it('should use per-provider timeout over global timeout', async () => {
+    // Adapter with 5000ms per-provider timeout
+    const timeoutAdapter = createTimeoutAdapter('provider-a', 5000);
+    const registry = createRegistry([timeoutAdapter]);
+
+    const chain: Chain = {
+      name: 'test-chain',
+      entries: [{ providerId: 'provider-a', model: 'model-1' }],
+    };
+
+    try {
+      await executeChain(chain, makeRequest(), tracker, registry, 30_000);
+      expect.fail('Should have thrown');
+    } catch (error) {
+      const exhaustedError = error as AllProvidersExhaustedError;
+      expect(exhaustedError.attempts).toHaveLength(1);
+      // Error string should reflect the per-provider timeout (5000ms), not global (30000ms)
+      expect(exhaustedError.attempts[0]!.error).toBe('timeout_5000ms');
+    }
+  });
+
+  it('should fall back to global timeout when adapter has no per-provider timeout', async () => {
+    // Adapter WITHOUT timeout property (undefined)
+    const timeoutAdapter = createTimeoutAdapter('provider-a', undefined);
+    const registry = createRegistry([timeoutAdapter]);
+
+    const chain: Chain = {
+      name: 'test-chain',
+      entries: [{ providerId: 'provider-a', model: 'model-1' }],
+    };
+
+    try {
+      await executeChain(chain, makeRequest(), tracker, registry, 15_000);
+      expect.fail('Should have thrown');
+    } catch (error) {
+      const exhaustedError = error as AllProvidersExhaustedError;
+      expect(exhaustedError.attempts).toHaveLength(1);
+      // Error string should reflect the global timeout (15000ms)
+      expect(exhaustedError.attempts[0]!.error).toBe('timeout_15000ms');
+    }
   });
 });

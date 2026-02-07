@@ -27,6 +27,7 @@ import type { Chain, ChainResult, StreamChainResult } from './types.js';
  * @param request - The incoming chat completion request.
  * @param tracker - Rate limit tracker to check/update provider state.
  * @param registry - Provider adapter registry.
+ * @param globalTimeoutMs - Global timeout in milliseconds (default for providers without per-provider timeout).
  * @returns The successful chain result including response and metadata.
  * @throws AllProvidersExhaustedError when all entries fail or are skipped.
  */
@@ -35,6 +36,7 @@ export async function executeChain(
   request: ChatCompletionRequest,
   tracker: RateLimitTracker,
   registry: ProviderRegistry,
+  globalTimeoutMs: number,
 ): Promise<ChainResult> {
   const attempts: AttemptRecord[] = [];
 
@@ -59,8 +61,12 @@ export async function executeChain(
     const adapter = registry.get(entry.providerId);
     const attemptStart = performance.now();
 
+    // Create timeout signal (per-provider timeout overrides global)
+    const timeoutMs = adapter.timeout ?? globalTimeoutMs;
+    const timeoutSignal = AbortSignal.timeout(timeoutMs);
+
     try {
-      const result = await adapter.chatCompletion(entry.model, request);
+      const result = await adapter.chatCompletion(entry.model, request, timeoutSignal);
 
       const latencyMs = performance.now() - attemptStart;
 
@@ -163,6 +169,28 @@ export async function executeChain(
         continue;
       }
 
+      // Timeout: waterfall WITHOUT cooldown (transient, not a rate limit)
+      if (error instanceof Error && error.name === 'TimeoutError') {
+        const timeoutMs = adapter.timeout ?? globalTimeoutMs;
+        logger.info(
+          {
+            provider: entry.providerId,
+            model: entry.model,
+            chain: chain.name,
+            timeoutMs,
+            latencyMs: Math.round(latencyMs),
+          },
+          `Provider ${entry.providerId}/${entry.model} timed out after ${timeoutMs}ms, waterfalling (no cooldown)`,
+        );
+
+        attempts.push({
+          provider: entry.providerId,
+          model: entry.model,
+          error: `timeout_${timeoutMs}ms`,
+        });
+        continue;
+      }
+
       // Unknown error (network timeout, DNS failure, connection refused, etc.)
       const errorMessage =
         error instanceof Error ? error.message : String(error);
@@ -214,6 +242,7 @@ export async function executeStreamChain(
   tracker: RateLimitTracker,
   registry: ProviderRegistry,
   signal?: AbortSignal,
+  globalTimeoutMs?: number,
 ): Promise<StreamChainResult> {
   const attempts: AttemptRecord[] = [];
 
@@ -234,8 +263,18 @@ export async function executeStreamChain(
 
     const adapter = registry.get(entry.providerId);
 
+    // Create combined signal: timeout + client abort signal
+    const timeoutMs = adapter.timeout ?? globalTimeoutMs;
+    let effectiveSignal = signal;
+    if (timeoutMs) {
+      const timeoutSignal = AbortSignal.timeout(timeoutMs);
+      effectiveSignal = signal
+        ? AbortSignal.any([timeoutSignal, signal])
+        : timeoutSignal;
+    }
+
     try {
-      const response = await adapter.chatCompletionStream(entry.model, request, signal);
+      const response = await adapter.chatCompletionStream(entry.model, request, effectiveSignal);
 
       // Parse rate limit headers from streaming response (headers available before body consumed)
       const rateLimitInfo = adapter.parseRateLimitHeaders(response.headers);
@@ -262,6 +301,21 @@ export async function executeStreamChain(
         attempts,
       };
     } catch (error: unknown) {
+      // Timeout: waterfall WITHOUT cooldown (must check BEFORE AbortError)
+      if (error instanceof Error && error.name === 'TimeoutError') {
+        const timeoutMs = adapter.timeout ?? globalTimeoutMs;
+        logger.info(
+          { provider: entry.providerId, model: entry.model, chain: chain.name, timeoutMs },
+          `Provider ${entry.providerId}/${entry.model} timed out [stream], waterfalling (no cooldown)`,
+        );
+        attempts.push({
+          provider: entry.providerId,
+          model: entry.model,
+          error: `timeout_${timeoutMs}ms`,
+        });
+        continue;
+      }
+
       if (error instanceof ProviderRateLimitError) {
         const retryAfterHeader = error.headers.get('retry-after');
         let retryAfterMs: number | undefined;
