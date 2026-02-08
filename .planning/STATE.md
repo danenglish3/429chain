@@ -11,7 +11,7 @@ See: .planning/PROJECT.md (updated 2026-02-06)
 
 Milestone: v1.0 MVP (shipped 2026-02-06)
 Status: Complete
-Last activity: 2026-02-08 - Completed quick task 006: Add OpenAI and Moonshot providers
+Last activity: 2026-02-08 - Completed quick task 007: Documentation update and chain test feature
 
 Progress: [█████████████████████] 100%
 
@@ -138,11 +138,12 @@ None yet.
 | 004 | Provider adapter creation guide (docs/PROVIDERS.md) | 2026-02-08 | c65698f | [004-provider-adapter-creation-guides](./quick/004-provider-adapter-creation-guides/) |
 | 005 | Per-provider timeout with waterfall, no cooldown | 2026-02-08 | 1b91e1d | [005-per-provider-timeout-waterfall](./quick/005-per-provider-timeout-waterfall/) |
 | 006 | OpenAI provider + Moonshot generic-openai example | 2026-02-08 | c2e7307 | [006-add-openai-moonshot-providers](./quick/006-add-openai-moonshot-providers/) |
+| 007 | Documentation update and chain test feature | 2026-02-08 | 46a8da6 | [007-docs-update-chain-test-feature](./quick/007-docs-update-chain-test-feature/) |
 
 ## Session Continuity
 
 Last session: 2026-02-08
-Stopped at: Completed quick task 006
+Stopped at: Completed quick task 007
 Resume file: None
 
 Config:
