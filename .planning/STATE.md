@@ -11,7 +11,7 @@ See: .planning/PROJECT.md (updated 2026-02-06)
 
 Milestone: v1.0 MVP (shipped 2026-02-06)
 Status: Complete
-Last activity: 2026-02-08 - Completed quick task 008: Normalize reasoning content
+Last activity: 2026-02-08 - Completed quick task 009: Improve terminal log formatting
 
 Progress: [█████████████████████] 100%
 
@@ -140,11 +140,12 @@ None yet.
 | 006 | OpenAI provider + Moonshot generic-openai example | 2026-02-08 | c2e7307 | [006-add-openai-moonshot-providers](./quick/006-add-openai-moonshot-providers/) |
 | 007 | Documentation update and chain test feature | 2026-02-08 | 46a8da6 | [007-docs-update-chain-test-feature](./quick/007-docs-update-chain-test-feature/) |
 | 008 | Normalize reasoning_content for reasoning models | 2026-02-08 | 45c393e | [008-normalize-reasoning-content](./quick/008-normalize-reasoning-content/) |
+| 009 | Improve terminal log formatting | 2026-02-08 | d9fcee3 | [009-improve-terminal-log-formatting](./quick/009-improve-terminal-log-formatting/) |
 
 ## Session Continuity
 
 Last session: 2026-02-08
-Stopped at: Completed quick task 008
+Stopped at: Completed quick task 009
 Resume file: None
 
 Config:
