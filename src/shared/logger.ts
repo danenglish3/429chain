@@ -7,6 +7,15 @@ import pino from 'pino';
 
 const logLevel = process.env['LOG_LEVEL'] ?? 'info';
 
+// Determine if pretty logging should be used:
+// - Explicit LOG_FORMAT=pretty → use pretty
+// - Explicit LOG_FORMAT=json → use JSON
+// - Otherwise in non-production → use pretty (default dev experience)
+// - Production → use JSON
+const usePretty =
+  process.env['LOG_FORMAT'] === 'pretty' ||
+  (process.env['NODE_ENV'] !== 'production' && process.env['LOG_FORMAT'] !== 'json');
+
 export const logger = pino({
   name: '429chain',
   level: logLevel,
@@ -19,4 +28,14 @@ export const logger = pino({
     ],
     censor: '[REDACTED]',
   },
+  ...(usePretty && {
+    transport: {
+      target: 'pino-pretty',
+      options: {
+        translateTime: 'HH:MM:ss.l',
+        ignore: 'pid,hostname',
+        colorize: true,
+      },
+    },
+  }),
 });
