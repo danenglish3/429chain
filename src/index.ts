@@ -51,6 +51,7 @@ const tracker = new RateLimitTracker(
   config.settings.cooldownDefaultMs,
   config.settings.midStreamFailureThreshold,
   config.settings.midStreamCooldownMs,
+  config.settings.midStreamCooldownMaxMs,
 );
 
 // --- Register manual rate limits from config ---
@@ -113,7 +114,7 @@ const chatRoutes = createChatRoutes(
 );
 const modelsRoutes = createModelsRoutes(chains);
 const statsRoutes = createStatsRoutes(aggregator);
-const rateLimitRoutes = createRateLimitRoutes(tracker);
+const rateLimitRoutes = createRateLimitRoutes(tracker, chains);
 const adminRoutes = createAdminRoutes({
   configRef,
   configPath,

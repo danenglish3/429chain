@@ -20,6 +20,12 @@ interface RateLimitEntry {
   quota: QuotaInfo | null;
 }
 
+interface ActiveEntry {
+  chain: string;
+  provider: string;
+  model: string;
+}
+
 function getStatusBadgeClass(status: string): string {
   if (status === 'available') return styles.statusAvailable;
   if (status === 'tracking') return styles.statusTracking;
@@ -48,6 +54,7 @@ export default function RateLimitStatus() {
   });
 
   const rateLimits = data?.ratelimits || [];
+  const activeEntries: ActiveEntry[] = data?.activeEntries || [];
 
   if (isLoading) {
     return <div className={styles.loading}>Loading rate limit status...</div>;
@@ -67,6 +74,20 @@ export default function RateLimitStatus() {
 
   return (
     <div className={styles.container}>
+      {activeEntries.length > 0 && (
+        <div className={styles.activeSection}>
+          {activeEntries.map((entry: ActiveEntry) => (
+            <div key={entry.chain} className={styles.activeCard}>
+              <div className={styles.activeLabel}>ACTIVE ON {entry.chain.toUpperCase()}</div>
+              <div className={styles.activeModel}>
+                <span className={styles.provider}>{entry.provider}</span>
+                <span className={styles.separator}>/</span>
+                <span className={styles.model}>{entry.model}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
       <div className={styles.grid}>
         {rateLimits.map((entry: RateLimitEntry, index: number) => (
           <div key={`${entry.provider}-${entry.model}-${index}`} className={styles.card}>

@@ -40,17 +40,20 @@ export class RateLimitTracker {
   private defaultCooldownMs: number;
   private manualLimits = new Map<string, ManualLimitState>();
   private midStreamFailures = new Map<string, number>();
+  private midStreamEscalation = new Map<string, number>();
 
   /**
    * @param defaultCooldownMs - Default cooldown duration when no retry-after
    *   header is available. Typically from config.settings.cooldownDefaultMs.
    * @param midStreamFailureThreshold - Number of consecutive mid-stream failures before cooldown.
-   * @param midStreamCooldownMs - Cooldown duration for mid-stream failures.
+   * @param midStreamCooldownMs - Base cooldown duration for mid-stream failures (doubles each cycle).
+   * @param midStreamCooldownMaxMs - Maximum escalated cooldown duration.
    */
   constructor(
     defaultCooldownMs: number,
     private readonly midStreamFailureThreshold: number = 3,
-    private readonly midStreamCooldownMs: number = 30000,
+    private readonly midStreamCooldownMs: number = 120000,
+    private readonly midStreamCooldownMaxMs: number = 1800000,
   ) {
     this.defaultCooldownMs = defaultCooldownMs;
     this.cooldownManager = new CooldownManager();
@@ -403,16 +406,24 @@ export class RateLimitTracker {
     this.midStreamFailures.set(k, count);
 
     if (count >= this.midStreamFailureThreshold) {
+      // Escalate: double cooldown each cycle, capped at max
+      const escalation = this.midStreamEscalation.get(k) ?? 0;
+      const cooldownMs = Math.min(
+        this.midStreamCooldownMs * Math.pow(2, escalation),
+        this.midStreamCooldownMaxMs,
+      );
+      this.midStreamEscalation.set(k, escalation + 1);
+
       this.markExhausted(
         providerId,
         model,
-        this.midStreamCooldownMs,
-        'mid-stream failures exceeded threshold',
+        cooldownMs,
+        `mid-stream failures exceeded threshold (cooldown #${escalation + 1})`,
       );
       this.midStreamFailures.set(k, 0);
       logger.warn(
-        { providerId, model, count, threshold: this.midStreamFailureThreshold },
-        `Provider ${providerId}/${model} mid-stream failures (${count}) exceeded threshold (${this.midStreamFailureThreshold}), applying ${this.midStreamCooldownMs}ms cooldown`,
+        { providerId, model, count, threshold: this.midStreamFailureThreshold, cooldownMs, escalation: escalation + 1 },
+        `Provider ${providerId}/${model} mid-stream failures (${count}) exceeded threshold, applying ${cooldownMs}ms cooldown (escalation #${escalation + 1})`,
       );
     } else {
       logger.debug(
@@ -430,13 +441,15 @@ export class RateLimitTracker {
    */
   resetMidStreamFailures(providerId: string, model: string): void {
     const k = this.key(providerId, model);
-    const had = this.midStreamFailures.has(k);
+    const hadFailures = this.midStreamFailures.has(k);
+    const hadEscalation = this.midStreamEscalation.has(k);
     this.midStreamFailures.delete(k);
+    this.midStreamEscalation.delete(k);
 
-    if (had) {
+    if (hadFailures || hadEscalation) {
       logger.debug(
         { providerId, model },
-        `Provider ${providerId}/${model} mid-stream failure counter reset`,
+        `Provider ${providerId}/${model} mid-stream failure counter and escalation reset`,
       );
     }
   }
