@@ -56,6 +56,7 @@ export interface ChatCompletionChoice {
   message: {
     role: 'assistant';
     content: string | null;
+    reasoning_content?: string;
     tool_calls?: ToolCall[];
   };
   finish_reason: 'stop' | 'length' | 'tool_calls' | 'content_filter' | null;
@@ -83,6 +84,7 @@ export interface ChatCompletionResponse {
 export interface ChatCompletionDelta {
   role?: 'assistant';
   content?: string | null;
+  reasoning_content?: string;
   tool_calls?: ToolCall[];
 }
 

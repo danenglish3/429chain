@@ -50,6 +50,7 @@ export const SettingsSchema = z.object({
   cooldownDefaultMs: z.number().int().min(1000).default(60000),
   requestTimeoutMs: z.number().int().min(1000).default(30000),
   dbPath: z.string().default('./data/observability.db'),
+  normalizeResponses: z.boolean().default(false),
 });
 
 /** Top-level config schema with cross-reference validation. */

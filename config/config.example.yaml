@@ -9,6 +9,7 @@ settings:
   logLevel: info
   cooldownDefaultMs: 60000       # Default cooldown on 429 (ms)
   requestTimeoutMs: 30000        # Global default timeout for upstream requests (ms). Per-provider timeout overrides this.
+  normalizeResponses: false      # Move reasoning_content to content for reasoning models (e.g. DeepSeek R1)
 
 providers:
   - id: openrouter
