@@ -160,6 +160,7 @@ Provider definitions. Each provider represents an upstream LLM API.
 | `type` | enum | Yes | Provider adapter: `openrouter`, `groq`, `cerebras`, `openai`, `generic-openai` |
 | `apiKey` | string | Yes | Provider API key |
 | `baseUrl` | url | No | Override default base URL (required for `generic-openai` type) |
+| `timeout` | number | No | Per-provider request timeout in milliseconds. Overrides global `requestTimeoutMs`. |
 | `rateLimits` | object | No | Manual rate limit fallback (see below) |
 
 **Provider Types:**
@@ -197,6 +198,7 @@ providers:
     name: Groq
     type: groq
     apiKey: "gsk_your-key-here"
+    timeout: 10000  # 10 second timeout (overrides global requestTimeoutMs)
     rateLimits:
       requestsPerMinute: 30
       tokensPerMinute: 15000
@@ -304,6 +306,7 @@ providers:
     type: groq
     apiKey: "gsk_your-key-here"
     # baseUrl defaults to https://api.groq.com/openai/v1
+    timeout: 10000  # 10 second timeout (overrides global requestTimeoutMs)
     # Optional: manual rate limits as fallback when provider headers unavailable
     rateLimits:
       requestsPerMinute: 30    # Groq free tier: 30 RPM
@@ -1116,6 +1119,84 @@ curl -X DELETE http://localhost:3429/v1/admin/chains/old-chain \
 
 ---
 
+### 4.6 Chain Walk Test
+
+Test each entry in a chain individually without waterfall behavior. Useful for diagnosing which providers are healthy.
+
+#### POST /v1/test/chain/:name
+
+Walk through each entry in the named chain, sending a test request to each provider+model individually.
+
+**Auth:** Required (Bearer token)
+
+**Parameters:**
+
+- `name` (path): Chain name (e.g., "default", "fast")
+
+**Request Body (optional):**
+
+```json
+{
+  "prompt": "Say hello in one word."
+}
+```
+
+If omitted, defaults to "Say hello in one word."
+
+**Response:**
+
+```json
+{
+  "chain": "default",
+  "results": [
+    {
+      "provider": "openrouter",
+      "model": "meta-llama/llama-3.1-8b-instruct:free",
+      "status": "ok",
+      "latencyMs": 1234,
+      "response": "Hello!",
+      "tokens": { "prompt": 12, "completion": 3, "total": 15 }
+    },
+    {
+      "provider": "groq",
+      "model": "llama-3.1-8b-instant",
+      "status": "error",
+      "latencyMs": 5023,
+      "error": "429: rate limited"
+    }
+  ],
+  "summary": {
+    "total": 3,
+    "ok": 2,
+    "failed": 1
+  }
+}
+```
+
+**Result Entry Fields:**
+
+| Field | Type | Present | Description |
+|-------|------|---------|-------------|
+| `provider` | string | Always | Provider ID |
+| `model` | string | Always | Model ID |
+| `status` | string | Always | `"ok"` or `"error"` |
+| `latencyMs` | number | Always | Request latency in ms |
+| `response` | string | On success | First choice content (truncated to 200 chars) |
+| `tokens` | object | On success | Token usage `{ prompt, completion, total }` |
+| `error` | string | On error | Error description |
+
+**Example:**
+
+```bash
+# Test all entries in the default chain
+curl -X POST http://localhost:3429/v1/test/chain/default \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"prompt": "Say hi"}'
+```
+
+---
+
 ## 5. Authentication
 
 All `/v1/*` routes require Bearer token authentication. The `/health` endpoint is public.
@@ -1303,6 +1384,7 @@ All errors follow this structure:
 |--------|------|------|-------------|
 | 401 | `invalid_api_key` | `invalid_request_error` | Authentication failed |
 | 400 | `invalid_request` | `invalid_request_error` | Malformed request body |
+| 402 | `payment_required` | `billing_error` | Provider requires payment (5-minute cooldown applied) |
 | 503 | `all_providers_exhausted` | `service_unavailable` | All chain entries failed or rate limited |
 | 500 | `internal_error` | `server_error` | Internal proxy error |
 
@@ -1403,6 +1485,12 @@ When a provider returns a 429 or runs out of quota:
 2. **Cooldown timer is set** (default: 60 seconds, configurable via `cooldownDefaultMs`)
 3. **During cooldown:** Provider+model is skipped in waterfall
 4. **After cooldown:** Provider+model becomes available again
+
+**402 Payment Required:** OpenRouter may return 402 when a model requires credits. The proxy treats this like a rate limit, applying a 5-minute cooldown to that provider+model pair and continuing to the next chain entry.
+
+**Timeout Waterfall:** When a per-provider or global timeout fires, the request is aborted and the proxy moves to the next chain entry. Unlike 429 responses, timeouts do NOT apply a cooldown — the provider remains available for subsequent requests.
+
+**Float Retry-After:** The proxy parses `retry-after` headers as floating-point values, supporting sub-second precision (e.g., `retry-after: 0.5` means 500ms).
 
 ### Three-State Model
 
