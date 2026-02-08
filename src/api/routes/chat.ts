@@ -11,6 +11,7 @@ import { executeChain, executeStreamChain, resolveChain } from '../../chain/rout
 import { AllProvidersExhaustedError } from '../../shared/errors.js';
 import { createSSEParser } from '../../streaming/sse-parser.js';
 import { RequestLogger } from '../../persistence/request-logger.js';
+import { normalizeResponse, normalizeChunk } from '../../shared/normalize.js';
 import type { Chain, StreamChainResult } from '../../chain/types.js';
 import type { RateLimitTracker } from '../../ratelimit/tracker.js';
 import type { ProviderRegistry } from '../../providers/types.js';
@@ -24,6 +25,7 @@ import type { ChatCompletionRequest, Usage } from '../../shared/types.js';
  * @param defaultChainName - Default chain name from config.
  * @param requestLogger - Request logger for observability.
  * @param globalTimeoutMs - Global timeout in milliseconds for upstream requests.
+ * @param normalizeResponses - If true, move reasoning_content to content for reasoning models.
  * @returns Hono app with POST /chat/completions route.
  */
 export function createChatRoutes(
@@ -33,6 +35,7 @@ export function createChatRoutes(
   defaultChainName: string,
   requestLogger: RequestLogger,
   globalTimeoutMs: number,
+  normalizeResponses: boolean,
 ) {
   const app = new Hono();
 
@@ -127,7 +130,9 @@ export function createChatRoutes(
                 // Not JSON or doesn't have usage -- normal content chunk, continue
               }
 
-              await stream.writeSSE({ data });
+              // Apply normalization if enabled (after usage capture)
+              const normalizedData = normalizeResponses ? normalizeChunk(data) : data;
+              await stream.writeSSE({ data: normalizedData });
             }
 
             if (result.done) {
@@ -227,6 +232,11 @@ export function createChatRoutes(
         logger.error({ error }, 'Failed to log request');
       }
     });
+
+    // Apply normalization if enabled
+    if (normalizeResponses) {
+      normalizeResponse(result.response);
+    }
 
     return c.json(result.response);
   });

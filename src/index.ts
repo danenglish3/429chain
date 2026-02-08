@@ -98,7 +98,15 @@ const auth = createAuthMiddleware(config.settings.apiKeys);
 const v1 = new Hono();
 v1.use('*', auth);
 
-const chatRoutes = createChatRoutes(chains, tracker, registry, config.settings.defaultChain, requestLogger, config.settings.requestTimeoutMs);
+const chatRoutes = createChatRoutes(
+  chains,
+  tracker,
+  registry,
+  config.settings.defaultChain,
+  requestLogger,
+  config.settings.requestTimeoutMs,
+  config.settings.normalizeResponses,
+);
 const modelsRoutes = createModelsRoutes(chains);
 const statsRoutes = createStatsRoutes(aggregator);
 const rateLimitRoutes = createRateLimitRoutes(tracker);
