@@ -5,4 +5,5 @@ export const queryKeys = {
   requests: (limit: number) => ['requests', limit] as const,
   rateLimits: ['rateLimits'] as const,
   models: ['models'] as const,
+  chainTest: (name: string) => ['chainTest', name] as const,
 };

@@ -31,6 +31,20 @@ interface TestResult {
   latencyMs: number;
 }
 
+interface ChainTestResult {
+  chain: string;
+  results: Array<{
+    provider: string;
+    model: string;
+    status: 'ok' | 'error';
+    latencyMs: number;
+    response?: string;
+    tokens?: { prompt: number; completion: number; total: number };
+    error?: string;
+  }>;
+  summary: { total: number; ok: number; failed: number };
+}
+
 export default function Test() {
   const [prompt, setPrompt] = useState('');
   const [selectedChain, setSelectedChain] = useState('');
@@ -90,9 +104,20 @@ export default function Test() {
     },
   });
 
+  const chainTestMutation = useMutation<ChainTestResult, Error, void>({
+    mutationFn: async () => {
+      const chainName = selectedChain || 'default';
+      return api.testChain(chainName, prompt || undefined);
+    },
+  });
+
   const handleSend = () => {
     if (!prompt.trim()) return;
     testMutation.mutate();
+  };
+
+  const handleTestChain = () => {
+    chainTestMutation.mutate();
   };
 
   const chains = configQuery.data?.chains || [];
@@ -112,7 +137,7 @@ export default function Test() {
               className={styles.chainSelector}
               value={selectedChain}
               onChange={(e) => setSelectedChain(e.target.value)}
-              disabled={testMutation.isPending}
+              disabled={testMutation.isPending || chainTestMutation.isPending}
             >
               <option value="">(default chain)</option>
               {chains.map((chain: any) => (
@@ -139,17 +164,26 @@ export default function Test() {
           placeholder="Enter your message..."
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
-          disabled={testMutation.isPending}
+          disabled={testMutation.isPending || chainTestMutation.isPending}
           rows={5}
         />
 
-        <button
-          className={styles.sendButton}
-          onClick={handleSend}
-          disabled={testMutation.isPending || !prompt.trim()}
-        >
-          {testMutation.isPending ? 'Sending...' : 'Send'}
-        </button>
+        <div className={styles.buttonGroup}>
+          <button
+            className={styles.sendButton}
+            onClick={handleSend}
+            disabled={testMutation.isPending || chainTestMutation.isPending || !prompt.trim()}
+          >
+            {testMutation.isPending ? 'Sending...' : 'Send'}
+          </button>
+          <button
+            className={styles.testChainButton}
+            onClick={handleTestChain}
+            disabled={testMutation.isPending || chainTestMutation.isPending}
+          >
+            {chainTestMutation.isPending ? 'Testing...' : 'Test Chain'}
+          </button>
+        </div>
       </section>
 
       {/* Response Section */}
@@ -184,6 +218,77 @@ export default function Test() {
 
               <div className={styles.responseContent}>
                 <pre>{result.response.choices[0]?.message?.content || '(no content)'}</pre>
+              </div>
+            </>
+          )}
+        </section>
+      )}
+
+      {/* Chain Test Results */}
+      {(chainTestMutation.data || chainTestMutation.error) && (
+        <section className={styles.responseSection}>
+          <h2 className={styles.sectionTitle}>Chain Test Results</h2>
+
+          {chainTestMutation.error && (
+            <div className={styles.errorContainer}>
+              <div className={styles.errorMessage}>
+                Error: {chainTestMutation.error.message}
+              </div>
+            </div>
+          )}
+
+          {chainTestMutation.data && (
+            <>
+              <div className={styles.chainTestSummary}>
+                <span className={styles.summaryItem}>
+                  Chain: <strong>{chainTestMutation.data.chain}</strong>
+                </span>
+                <span className={styles.summaryItem}>
+                  Passed: <strong className={styles.okCount}>{chainTestMutation.data.summary.ok}</strong>
+                  {' / '}
+                  {chainTestMutation.data.summary.total}
+                </span>
+                {chainTestMutation.data.summary.failed > 0 && (
+                  <span className={styles.summaryItem}>
+                    Failed: <strong className={styles.failedCount}>{chainTestMutation.data.summary.failed}</strong>
+                  </span>
+                )}
+              </div>
+
+              <div className={styles.chainTestResults}>
+                {chainTestMutation.data.results.map((entry, idx) => (
+                  <div
+                    key={idx}
+                    className={`${styles.chainTestEntry} ${entry.status === 'ok' ? styles.entryOk : styles.entryError}`}
+                  >
+                    <div className={styles.entryHeader}>
+                      <span className={styles.entryStatus}>
+                        {entry.status === 'ok' ? 'OK' : 'FAIL'}
+                      </span>
+                      <span className={styles.entryProvider}>
+                        {entry.provider}/{entry.model}
+                      </span>
+                      <span className={styles.entryLatency}>
+                        {entry.latencyMs}ms
+                      </span>
+                    </div>
+                    {entry.status === 'ok' && (
+                      <div className={styles.entryBody}>
+                        <div className={styles.entryResponse}>{entry.response}</div>
+                        {entry.tokens && (
+                          <div className={styles.entryTokens}>
+                            {entry.tokens.prompt} + {entry.tokens.completion} = {entry.tokens.total} tokens
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {entry.status === 'error' && (
+                      <div className={styles.entryBody}>
+                        <div className={styles.entryErrorText}>{entry.error}</div>
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
             </>
           )}

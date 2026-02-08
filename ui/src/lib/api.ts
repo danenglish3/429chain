@@ -80,4 +80,21 @@ export const api = {
     method: 'POST',
     body: JSON.stringify(body)
   }),
+  testChain: (chainName: string, prompt?: string) =>
+    apiFetch<{
+      chain: string;
+      results: Array<{
+        provider: string;
+        model: string;
+        status: 'ok' | 'error';
+        latencyMs: number;
+        response?: string;
+        tokens?: { prompt: number; completion: number; total: number };
+        error?: string;
+      }>;
+      summary: { total: number; ok: number; failed: number };
+    }>(`/v1/test/chain/${chainName}`, {
+      method: 'POST',
+      body: JSON.stringify({ prompt: prompt || undefined }),
+    }),
 };
