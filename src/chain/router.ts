@@ -40,7 +40,15 @@ export async function executeChain(
 ): Promise<ChainResult> {
   const attempts: AttemptRecord[] = [];
 
-  for (const entry of chain.entries) {
+  for (let i = 0; i < chain.entries.length; i++) {
+    const entry = chain.entries[i]!;
+
+    // Find next non-exhausted entry for log context (best-effort, don't pre-check all)
+    const nextEntry = chain.entries[i + 1];
+    const nextHint = nextEntry
+      ? ` -> next: ${nextEntry.providerId}/${nextEntry.model}`
+      : ' -> no more providers';
+
     // Check if this provider+model is on cooldown
     if (tracker.isExhausted(entry.providerId, entry.model)) {
       logger.info(
@@ -125,8 +133,9 @@ export async function executeChain(
             chain: chain.name,
             latencyMs: Math.round(latencyMs),
             retryAfterMs,
+            next: nextEntry ? `${nextEntry.providerId}/${nextEntry.model}` : null,
           },
-          `Provider ${entry.providerId}/${entry.model} returned 429, waterfalling`,
+          `Provider ${entry.providerId}/${entry.model} returned 429, waterfalling${nextHint}`,
         );
 
         attempts.push({
@@ -157,8 +166,9 @@ export async function executeChain(
             chain: chain.name,
             statusCode: error.statusCode,
             latencyMs: Math.round(latencyMs),
+            next: nextEntry ? `${nextEntry.providerId}/${nextEntry.model}` : null,
           },
-          `Provider ${entry.providerId}/${entry.model} returned ${error.statusCode}, waterfalling`,
+          `Provider ${entry.providerId}/${entry.model} returned ${error.statusCode}, waterfalling${nextHint}`,
         );
 
         attempts.push({
@@ -179,8 +189,9 @@ export async function executeChain(
             chain: chain.name,
             timeoutMs,
             latencyMs: Math.round(latencyMs),
+            next: nextEntry ? `${nextEntry.providerId}/${nextEntry.model}` : null,
           },
-          `Provider ${entry.providerId}/${entry.model} timed out after ${timeoutMs}ms, waterfalling (no cooldown)`,
+          `Provider ${entry.providerId}/${entry.model} timed out after ${timeoutMs}ms, waterfalling (no cooldown)${nextHint}`,
         );
 
         attempts.push({
@@ -202,8 +213,9 @@ export async function executeChain(
           chain: chain.name,
           error: errorMessage,
           latencyMs: Math.round(latencyMs),
+          next: nextEntry ? `${nextEntry.providerId}/${nextEntry.model}` : null,
         },
-        `Provider ${entry.providerId}/${entry.model} failed: ${errorMessage}, waterfalling`,
+        `Provider ${entry.providerId}/${entry.model} failed: ${errorMessage}, waterfalling${nextHint}`,
       );
 
       attempts.push({
@@ -246,7 +258,15 @@ export async function executeStreamChain(
 ): Promise<StreamChainResult> {
   const attempts: AttemptRecord[] = [];
 
-  for (const entry of chain.entries) {
+  for (let i = 0; i < chain.entries.length; i++) {
+    const entry = chain.entries[i]!;
+
+    // Find next non-exhausted entry for log context (best-effort, don't pre-check all)
+    const nextEntry = chain.entries[i + 1];
+    const nextHint = nextEntry
+      ? ` -> next: ${nextEntry.providerId}/${nextEntry.model}`
+      : ' -> no more providers';
+
     if (tracker.isExhausted(entry.providerId, entry.model)) {
       logger.info(
         { provider: entry.providerId, model: entry.model, chain: chain.name },
@@ -305,8 +325,14 @@ export async function executeStreamChain(
       if (error instanceof Error && error.name === 'TimeoutError') {
         const timeoutMs = adapter.timeout ?? globalTimeoutMs;
         logger.info(
-          { provider: entry.providerId, model: entry.model, chain: chain.name, timeoutMs },
-          `Provider ${entry.providerId}/${entry.model} timed out [stream], waterfalling (no cooldown)`,
+          {
+            provider: entry.providerId,
+            model: entry.model,
+            chain: chain.name,
+            timeoutMs,
+            next: nextEntry ? `${nextEntry.providerId}/${nextEntry.model}` : null,
+          },
+          `Provider ${entry.providerId}/${entry.model} timed out [stream], waterfalling (no cooldown)${nextHint}`,
         );
         attempts.push({
           provider: entry.providerId,
@@ -334,8 +360,14 @@ export async function executeStreamChain(
         );
 
         logger.info(
-          { provider: entry.providerId, model: entry.model, chain: chain.name, retryAfterMs },
-          `Provider ${entry.providerId}/${entry.model} returned 429 [stream], waterfalling`,
+          {
+            provider: entry.providerId,
+            model: entry.model,
+            chain: chain.name,
+            retryAfterMs,
+            next: nextEntry ? `${nextEntry.providerId}/${nextEntry.model}` : null,
+          },
+          `Provider ${entry.providerId}/${entry.model} returned 429 [stream], waterfalling${nextHint}`,
         );
 
         attempts.push({
@@ -359,8 +391,14 @@ export async function executeStreamChain(
         }
 
         logger.info(
-          { provider: entry.providerId, model: entry.model, chain: chain.name, statusCode: error.statusCode },
-          `Provider ${entry.providerId}/${entry.model} returned ${error.statusCode} [stream], waterfalling`,
+          {
+            provider: entry.providerId,
+            model: entry.model,
+            chain: chain.name,
+            statusCode: error.statusCode,
+            next: nextEntry ? `${nextEntry.providerId}/${nextEntry.model}` : null,
+          },
+          `Provider ${entry.providerId}/${entry.model} returned ${error.statusCode} [stream], waterfalling${nextHint}`,
         );
         attempts.push({
           provider: entry.providerId,
@@ -378,8 +416,14 @@ export async function executeStreamChain(
       }
 
       logger.info(
-        { provider: entry.providerId, model: entry.model, chain: chain.name, error: errorMessage },
-        `Provider ${entry.providerId}/${entry.model} failed [stream]: ${errorMessage}, waterfalling`,
+        {
+          provider: entry.providerId,
+          model: entry.model,
+          chain: chain.name,
+          error: errorMessage,
+          next: nextEntry ? `${nextEntry.providerId}/${nextEntry.model}` : null,
+        },
+        `Provider ${entry.providerId}/${entry.model} failed [stream]: ${errorMessage}, waterfalling${nextHint}`,
       );
       attempts.push({
         provider: entry.providerId,

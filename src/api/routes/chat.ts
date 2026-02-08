@@ -176,8 +176,13 @@ export function createChatRoutes(
           // Real error during streaming -- send error event to client
           const errorMessage = error instanceof Error ? error.message : String(error);
           logger.error(
-            { provider: streamResult.providerId, model: streamResult.model, error: errorMessage },
-            'Mid-stream error',
+            {
+              provider: streamResult.providerId,
+              model: streamResult.model,
+              chain: chain.name,
+              error: errorMessage,
+            },
+            `Mid-stream error from ${streamResult.providerId}/${streamResult.model}: ${errorMessage} (stream will close, client must retry)`,
           );
 
           try {
