@@ -47,6 +47,15 @@ export interface RequestLogRow {
 }
 
 /**
+ * Summary statistics across all requests.
+ */
+export interface SummaryStats {
+  totalRequests: number;
+  waterfallRequests: number;
+  avgLatencyMs: number;
+}
+
+/**
  * UsageAggregator provides read access to aggregated usage statistics.
  * All data is pre-computed via SQLite triggers, so reads are fast O(1) lookups.
  */
@@ -56,6 +65,7 @@ export class UsageAggregator {
   private getAllChainUsageStmt: Database.Statement;
   private getChainUsageStmt: Database.Statement;
   private getRecentRequestsStmt: Database.Statement;
+  private getSummaryStatsStmt: Database.Statement;
 
   constructor(db: Database.Database) {
     this.getAllProviderUsageStmt = db.prepare(`
@@ -123,6 +133,14 @@ export class UsageAggregator {
       ORDER BY timestamp DESC
       LIMIT ?
     `);
+
+    this.getSummaryStatsStmt = db.prepare(`
+      SELECT
+        COUNT(*) as totalRequests,
+        SUM(CASE WHEN attempts > 1 THEN 1 ELSE 0 END) as waterfallRequests,
+        ROUND(AVG(latency_ms)) as avgLatencyMs
+      FROM request_logs
+    `);
   }
 
   /**
@@ -158,5 +176,13 @@ export class UsageAggregator {
    */
   getRecentRequests(limit: number = 50): RequestLogRow[] {
     return this.getRecentRequestsStmt.all(limit) as RequestLogRow[];
+  }
+
+  /**
+   * Get summary statistics across all requests.
+   */
+  getSummaryStats(): SummaryStats {
+    const result = this.getSummaryStatsStmt.get() as SummaryStats | undefined;
+    return result ?? { totalRequests: 0, waterfallRequests: 0, avgLatencyMs: 0 };
   }
 }

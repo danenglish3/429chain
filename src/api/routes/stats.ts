@@ -14,6 +14,13 @@ import type { UsageAggregator } from '../../persistence/aggregator.js';
 export function createStatsRoutes(aggregator: UsageAggregator) {
   const app = new Hono();
 
+  // GET /summary - Summary statistics across all requests
+  app.get('/summary', (c) => {
+    return c.json({
+      summary: aggregator.getSummaryStats(),
+    });
+  });
+
   // GET /providers - All provider usage statistics
   app.get('/providers', (c) => {
     return c.json({

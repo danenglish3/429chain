@@ -74,6 +74,7 @@ export const api = {
   getProviderStats: () => apiFetch<{ providers: any[] }>('/v1/stats/providers'),
   getChainStats: () => apiFetch<{ chains: any[] }>('/v1/stats/chains'),
   getRequests: (limit = 50) => apiFetch<{ requests: any[] }>(`/v1/stats/requests?limit=${limit}`),
+  getSummaryStats: () => apiFetch<{ summary: { totalRequests: number; waterfallRequests: number; avgLatencyMs: number } }>('/v1/stats/summary'),
   getRateLimits: () => apiFetch<{ ratelimits: any[] }>('/v1/ratelimits'),
   getModels: () => apiFetch<{ data: any[] }>('/v1/models'),
   chatCompletion: (body: any) => apiFetch<any>('/v1/chat/completions', {
