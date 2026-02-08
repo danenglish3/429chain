@@ -31,17 +31,20 @@ interface TestResult {
   latencyMs: number;
 }
 
+interface ChainTestEntry {
+  provider: string;
+  model: string;
+  status: 'ok' | 'error';
+  latencyMs: number;
+  response?: string;
+  tokens?: { prompt: number; completion: number; total: number };
+  error?: string;
+  raw?: unknown;
+}
+
 interface ChainTestResult {
   chain: string;
-  results: Array<{
-    provider: string;
-    model: string;
-    status: 'ok' | 'error';
-    latencyMs: number;
-    response?: string;
-    tokens?: { prompt: number; completion: number; total: number };
-    error?: string;
-  }>;
+  results: ChainTestEntry[];
   summary: { total: number; ok: number; failed: number };
 }
 
@@ -49,6 +52,16 @@ export default function Test() {
   const [prompt, setPrompt] = useState('');
   const [selectedChain, setSelectedChain] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
+  const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
+
+  const toggleRow = (idx: number) => {
+    setExpandedRows((prev) => {
+      const next = new Set(prev);
+      if (next.has(idx)) next.delete(idx);
+      else next.add(idx);
+      return next;
+    });
+  };
 
   const configQuery = useQuery({
     queryKey: queryKeys.config,
@@ -117,6 +130,7 @@ export default function Test() {
   };
 
   const handleTestChain = () => {
+    setExpandedRows(new Set());
     chainTestMutation.mutate();
   };
 
@@ -256,39 +270,61 @@ export default function Test() {
               </div>
 
               <div className={styles.chainTestResults}>
-                {chainTestMutation.data.results.map((entry, idx) => (
-                  <div
-                    key={idx}
-                    className={`${styles.chainTestEntry} ${entry.status === 'ok' ? styles.entryOk : styles.entryError}`}
-                  >
-                    <div className={styles.entryHeader}>
-                      <span className={styles.entryStatus}>
-                        {entry.status === 'ok' ? 'OK' : 'FAIL'}
-                      </span>
-                      <span className={styles.entryProvider}>
-                        {entry.provider}/{entry.model}
-                      </span>
-                      <span className={styles.entryLatency}>
-                        {entry.latencyMs}ms
-                      </span>
-                    </div>
-                    {entry.status === 'ok' && (
-                      <div className={styles.entryBody}>
-                        <div className={styles.entryResponse}>{entry.response}</div>
-                        {entry.tokens && (
-                          <div className={styles.entryTokens}>
-                            {entry.tokens.prompt} + {entry.tokens.completion} = {entry.tokens.total} tokens
+                {chainTestMutation.data.results.map((entry, idx) => {
+                  const isExpanded = expandedRows.has(idx);
+                  return (
+                    <div
+                      key={idx}
+                      className={`${styles.chainTestEntry} ${entry.status === 'ok' ? styles.entryOk : styles.entryError}`}
+                    >
+                      <div
+                        className={styles.entryHeader}
+                        onClick={() => toggleRow(idx)}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') toggleRow(idx); }}
+                      >
+                        <span className={styles.entryExpandIcon}>
+                          {isExpanded ? '\u25BC' : '\u25B6'}
+                        </span>
+                        <span className={styles.entryStatus}>
+                          {entry.status === 'ok' ? 'OK' : 'FAIL'}
+                        </span>
+                        <span className={styles.entryProvider}>
+                          {entry.provider}/{entry.model}
+                        </span>
+                        <span className={styles.entryLatency}>
+                          {entry.latencyMs}ms
+                        </span>
+                      </div>
+                      {entry.status === 'ok' && (
+                        <div className={styles.entryBody}>
+                          <div className={styles.entryResponse}>
+                            {entry.response || '(no text content — expand for raw response)'}
                           </div>
-                        )}
-                      </div>
-                    )}
-                    {entry.status === 'error' && (
-                      <div className={styles.entryBody}>
-                        <div className={styles.entryErrorText}>{entry.error}</div>
-                      </div>
-                    )}
-                  </div>
-                ))}
+                          {entry.tokens && (
+                            <div className={styles.entryTokens}>
+                              {entry.tokens.prompt} + {entry.tokens.completion} = {entry.tokens.total} tokens
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      {entry.status === 'error' && (
+                        <div className={styles.entryBody}>
+                          <div className={styles.entryErrorText}>{entry.error}</div>
+                        </div>
+                      )}
+                      {isExpanded && (
+                        <div className={styles.entryRawSection}>
+                          <div className={styles.entryRawLabel}>Raw Response</div>
+                          <pre className={styles.entryRawContent}>
+                            <code>{JSON.stringify(entry.raw ?? { error: entry.error }, null, 2)}</code>
+                          </pre>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </>
           )}

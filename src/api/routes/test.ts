@@ -17,6 +17,7 @@ interface TestEntryResult {
   response?: string;
   tokens?: { prompt: number; completion: number; total: number };
   error?: string;
+  raw?: unknown;
 }
 
 export function createTestRoutes(
@@ -75,7 +76,11 @@ export function createTestRoutes(
         clearTimeout(timer);
 
         const latencyMs = Math.round(performance.now() - startTime);
-        const content = providerResponse.body.choices[0]?.message?.content ?? '';
+        const message = providerResponse.body.choices[0]?.message;
+        // Some models (e.g. DeepSeek R1) put output in reasoning_content instead of content
+        const content = message?.content
+          || (message as Record<string, unknown>)?.reasoning_content as string
+          || '';
 
         results.push({
           provider: entry.providerId,
@@ -88,6 +93,7 @@ export function createTestRoutes(
             completion: providerResponse.body.usage?.completion_tokens ?? 0,
             total: providerResponse.body.usage?.total_tokens ?? 0,
           },
+          raw: providerResponse.body,
         });
       } catch (err: unknown) {
         const latencyMs = Math.round(performance.now() - startTime);

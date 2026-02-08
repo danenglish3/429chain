@@ -260,6 +260,19 @@
   align-items: center;
   gap: 1rem;
   font-size: 0.9rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.entryHeader:hover {
+  opacity: 0.8;
+}
+
+.entryExpandIcon {
+  font-size: 0.7rem;
+  color: #888;
+  width: 1rem;
+  flex-shrink: 0;
 }
 
 .entryStatus {
@@ -313,4 +326,40 @@
 .entryErrorText {
   color: #dc3545;
   font-weight: 500;
+}
+
+/* Raw Response Accordion */
+.entryRawSection {
+  margin-top: 0.75rem;
+  border-top: 1px solid #e0e0e0;
+  padding-top: 0.75rem;
+}
+
+.entryRawLabel {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #888;
+  margin-bottom: 0.5rem;
+}
+
+.entryRawContent {
+  margin: 0;
+  padding: 0.75rem;
+  background: #1e1e1e;
+  color: #d4d4d4;
+  border-radius: 4px;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-all;
+  overflow-x: auto;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.entryRawContent code {
+  font-family: inherit;
 }
