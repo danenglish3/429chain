@@ -174,3 +174,15 @@
   font-size: 14px;
   border-left: 4px solid #ffc107;
 }
+
+.errorNote {
+  background-color: #f8d7da;
+  color: #721c24;
+  padding: 12px;
+  border-radius: 6px;
+  margin-bottom: 16px;
+  font-size: 13px;
+  font-family: 'Courier New', monospace;
+  border-left: 4px solid #dc3545;
+  word-break: break-word;
+}

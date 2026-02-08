@@ -44,6 +44,7 @@ export interface RequestLogRow {
   latencyMs: number;
   httpStatus: number;
   attempts: number;
+  errorMessage: string | null;
 }
 
 /**
@@ -128,7 +129,8 @@ export class UsageAggregator {
         total_tokens as totalTokens,
         latency_ms as latencyMs,
         http_status as httpStatus,
-        attempts
+        attempts,
+        error_message as errorMessage
       FROM request_logs
       ORDER BY timestamp DESC
       LIMIT ?

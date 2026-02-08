@@ -84,6 +84,27 @@ export function createChatRoutes(
         );
       } catch (error) {
         if (error instanceof AllProvidersExhaustedError) {
+          // Log the failed request so it appears in the dashboard
+          const lastAttempt = error.attempts[error.attempts.length - 1];
+          setImmediate(() => {
+            try {
+              requestLogger.logRequest({
+                timestamp: Date.now(),
+                chainName: chain.name,
+                providerId: lastAttempt?.provider ?? 'unknown',
+                model: lastAttempt?.model ?? requestedModel,
+                promptTokens: 0,
+                completionTokens: 0,
+                totalTokens: 0,
+                latencyMs: 0,
+                httpStatus: 503,
+                attempts: error.attempts.length,
+                errorMessage: error.message,
+              });
+            } catch (logError) {
+              logger.error({ error: logError }, 'Failed to log exhausted request');
+            }
+          });
           return c.json(error.toOpenAIError(), 503);
         }
         throw error;
@@ -178,18 +199,41 @@ export function createChatRoutes(
 
           // Real error during streaming -- send error event to client
           const errorMessage = error instanceof Error ? error.message : String(error);
+          const streamLatencyMs = performance.now() - streamStart;
           logger.error(
             {
               provider: streamResult.providerId,
               model: streamResult.model,
               chain: chain.name,
               error: errorMessage,
+              latencyMs: Math.round(streamLatencyMs),
             },
             `Mid-stream error from ${streamResult.providerId}/${streamResult.model}: ${errorMessage} (stream will close, client must retry)`,
           );
 
           // Record mid-stream failure for cooldown tracking
           tracker.recordMidStreamFailure(streamResult.providerId, streamResult.model);
+
+          // Log the failed streaming request so it appears in the dashboard
+          setImmediate(() => {
+            try {
+              requestLogger.logRequest({
+                timestamp: Date.now(),
+                chainName: chain.name,
+                providerId: streamResult.providerId,
+                model: streamResult.model,
+                promptTokens: capturedUsage?.prompt_tokens ?? 0,
+                completionTokens: capturedUsage?.completion_tokens ?? 0,
+                totalTokens: capturedUsage?.total_tokens ?? 0,
+                latencyMs: streamLatencyMs,
+                httpStatus: 502,
+                attempts: streamResult.attempts.length + 1,
+                errorMessage,
+              });
+            } catch (logError) {
+              logger.error({ error: logError }, 'Failed to log mid-stream error request');
+            }
+          });
 
           try {
             await stream.writeSSE({
@@ -212,13 +256,40 @@ export function createChatRoutes(
     // Non-streaming path
     const { model: _model, stream: _stream, ...cleanBody } = body;
 
-    const result = await executeChain(
-      chain,
-      cleanBody as ChatCompletionRequest,
-      tracker,
-      registry,
-      globalTimeoutMs,
-    );
+    let result;
+    try {
+      result = await executeChain(
+        chain,
+        cleanBody as ChatCompletionRequest,
+        tracker,
+        registry,
+        globalTimeoutMs,
+      );
+    } catch (error) {
+      if (error instanceof AllProvidersExhaustedError) {
+        const lastAttempt = error.attempts[error.attempts.length - 1];
+        setImmediate(() => {
+          try {
+            requestLogger.logRequest({
+              timestamp: Date.now(),
+              chainName: chain.name,
+              providerId: lastAttempt?.provider ?? 'unknown',
+              model: lastAttempt?.model ?? requestedModel,
+              promptTokens: 0,
+              completionTokens: 0,
+              totalTokens: 0,
+              latencyMs: 0,
+              httpStatus: 502,
+              attempts: error.attempts.length,
+              errorMessage: error.message,
+            });
+          } catch (logError) {
+            logger.error({ error: logError }, 'Failed to log exhausted request');
+          }
+        });
+      }
+      throw error;
+    }
 
     // Set informational headers
     c.header('X-429chain-Provider', `${result.providerId}/${result.model}`);

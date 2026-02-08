@@ -52,7 +52,7 @@ export const SettingsSchema = z.object({
   dbPath: z.string().default('./data/observability.db'),
   normalizeResponses: z.boolean().default(false),
   midStreamFailureThreshold: z.number().int().min(1).default(3),
-  midStreamCooldownMs: z.number().int().min(1000).default(30000),
+  midStreamCooldownMs: z.number().int().min(1000).default(120000),
 });
 
 /** Top-level config schema with cross-reference validation. */

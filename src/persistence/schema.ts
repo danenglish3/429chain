@@ -117,6 +117,12 @@ export function migrateSchema(db: Database.Database): void {
         END;
       `);
     },
+    // Migration 2: Add error_message column to request_logs for failed request tracking
+    () => {
+      db.exec(`
+        ALTER TABLE request_logs ADD COLUMN error_message TEXT;
+      `);
+    },
   ];
 
   // Run migrations from current version to latest

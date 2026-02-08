@@ -19,6 +19,7 @@ export interface RequestLogEntry {
   latencyMs: number;
   httpStatus: number;
   attempts: number;
+  errorMessage?: string;
 }
 
 /**
@@ -40,9 +41,10 @@ export class RequestLogger {
         total_tokens,
         latency_ms,
         http_status,
-        attempts
+        attempts,
+        error_message
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
   }
 
@@ -61,7 +63,8 @@ export class RequestLogger {
       entry.totalTokens,
       Math.round(entry.latencyMs),
       entry.httpStatus,
-      entry.attempts
+      entry.attempts,
+      entry.errorMessage ?? null
     );
   }
 }

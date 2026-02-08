@@ -16,6 +16,7 @@ interface RequestLogRow {
   latencyMs: number;
   httpStatus: number;
   attempts: number;
+  errorMessage: string | null;
 }
 
 function formatTime(timestamp: number): string {
@@ -114,7 +115,12 @@ export default function RequestLog() {
                   <tr className={styles.expandedRow}>
                     <td colSpan={9}>
                       <div className={styles.expandedContent}>
-                        {request.attempts > 1 && (
+                        {request.errorMessage && (
+                          <div className={styles.errorNote}>
+                            {request.errorMessage}
+                          </div>
+                        )}
+                        {request.attempts > 1 && !request.errorMessage && (
                           <div className={styles.waterfallNote}>
                             This request was served after {request.attempts - 1} waterfall attempt(s)
                           </div>
