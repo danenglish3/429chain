@@ -51,6 +51,8 @@ export const SettingsSchema = z.object({
   requestTimeoutMs: z.number().int().min(1000).default(30000),
   dbPath: z.string().default('./data/observability.db'),
   normalizeResponses: z.boolean().default(false),
+  midStreamFailureThreshold: z.number().int().min(1).default(3),
+  midStreamCooldownMs: z.number().int().min(1000).default(30000),
 });
 
 /** Top-level config schema with cross-reference validation. */

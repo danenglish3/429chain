@@ -39,12 +39,19 @@ export class RateLimitTracker {
   private cooldownManager: CooldownManager;
   private defaultCooldownMs: number;
   private manualLimits = new Map<string, ManualLimitState>();
+  private midStreamFailures = new Map<string, number>();
 
   /**
    * @param defaultCooldownMs - Default cooldown duration when no retry-after
    *   header is available. Typically from config.settings.cooldownDefaultMs.
+   * @param midStreamFailureThreshold - Number of consecutive mid-stream failures before cooldown.
+   * @param midStreamCooldownMs - Cooldown duration for mid-stream failures.
    */
-  constructor(defaultCooldownMs: number) {
+  constructor(
+    defaultCooldownMs: number,
+    private readonly midStreamFailureThreshold: number = 3,
+    private readonly midStreamCooldownMs: number = 30000,
+  ) {
     this.defaultCooldownMs = defaultCooldownMs;
     this.cooldownManager = new CooldownManager();
   }
@@ -381,6 +388,56 @@ export class RateLimitTracker {
         'manual limit: daily request limit exceeded',
       );
       return;
+    }
+  }
+
+  /**
+   * Record a mid-stream failure for a provider+model pair.
+   * After threshold consecutive failures, mark provider+model as exhausted.
+   * @param providerId - Provider instance ID.
+   * @param model - Model ID.
+   */
+  recordMidStreamFailure(providerId: string, model: string): void {
+    const k = this.key(providerId, model);
+    const count = (this.midStreamFailures.get(k) ?? 0) + 1;
+    this.midStreamFailures.set(k, count);
+
+    if (count >= this.midStreamFailureThreshold) {
+      this.markExhausted(
+        providerId,
+        model,
+        this.midStreamCooldownMs,
+        'mid-stream failures exceeded threshold',
+      );
+      this.midStreamFailures.set(k, 0);
+      logger.warn(
+        { providerId, model, count, threshold: this.midStreamFailureThreshold },
+        `Provider ${providerId}/${model} mid-stream failures (${count}) exceeded threshold (${this.midStreamFailureThreshold}), applying ${this.midStreamCooldownMs}ms cooldown`,
+      );
+    } else {
+      logger.debug(
+        { providerId, model, count, threshold: this.midStreamFailureThreshold },
+        `Provider ${providerId}/${model} mid-stream failure ${count}/${this.midStreamFailureThreshold}`,
+      );
+    }
+  }
+
+  /**
+   * Reset mid-stream failure counter for a provider+model pair.
+   * Called on successful stream completion.
+   * @param providerId - Provider instance ID.
+   * @param model - Model ID.
+   */
+  resetMidStreamFailures(providerId: string, model: string): void {
+    const k = this.key(providerId, model);
+    const had = this.midStreamFailures.has(k);
+    this.midStreamFailures.delete(k);
+
+    if (had) {
+      logger.debug(
+        { providerId, model },
+        `Provider ${providerId}/${model} mid-stream failure counter reset`,
+      );
     }
   }
 
