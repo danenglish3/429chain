@@ -26,6 +26,7 @@ import { UsageAggregator } from './persistence/aggregator.js';
 import { createStatsRoutes } from './api/routes/stats.js';
 import { createRateLimitRoutes } from './api/routes/ratelimits.js';
 import { createAdminRoutes } from './api/routes/admin.js';
+import { createTestRoutes } from './api/routes/test.js';
 
 // --- Bootstrap ---
 
@@ -108,12 +109,14 @@ const adminRoutes = createAdminRoutes({
   chains,
   tracker,
 });
+const testRoutes = createTestRoutes(chains, registry, config.settings.requestTimeoutMs);
 
 v1.route('/', chatRoutes);
 v1.route('/', modelsRoutes);
 v1.route('/stats', statsRoutes);
 v1.route('/ratelimits', rateLimitRoutes);
 v1.route('/admin', adminRoutes);
+v1.route('/test', testRoutes);
 
 app.route('/v1', v1);
 
