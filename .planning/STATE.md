@@ -11,7 +11,7 @@ See: .planning/PROJECT.md (updated 2026-02-06)
 
 Milestone: v1.0 MVP (shipped 2026-02-06)
 Status: Complete
-Last activity: 2026-02-08 - Completed quick task 009: Improve terminal log formatting
+Last activity: 2026-02-08 - Completed quick task 010: Mid-stream timeout cooldown
 
 Progress: [█████████████████████] 100%
 
@@ -114,6 +114,8 @@ Recent decisions affecting current work:
 - [d071] Extract parseDurationToMs to shared utils.ts for Groq and OpenAI rate limit parsing
 - [d072] OpenAI as first-class provider type vs generic-openai (Go duration parsing for 6 headers)
 - [d073] Moonshot as generic-openai example (fully compatible, no custom headers)
+- [d074] Mid-stream failure tracking with consecutive failure counter: after N failures (default 3), provider+model enters cooldown (default 30s)
+- [d075] AbortError (client disconnect) does NOT count as mid-stream failure - only real provider errors trigger counter
 
 ### Roadmap Evolution
 
@@ -141,11 +143,12 @@ None yet.
 | 007 | Documentation update and chain test feature | 2026-02-08 | 46a8da6 | [007-docs-update-chain-test-feature](./quick/007-docs-update-chain-test-feature/) |
 | 008 | Normalize reasoning_content for reasoning models | 2026-02-08 | 45c393e | [008-normalize-reasoning-content](./quick/008-normalize-reasoning-content/) |
 | 009 | Improve terminal log formatting | 2026-02-08 | d9fcee3 | [009-improve-terminal-log-formatting](./quick/009-improve-terminal-log-formatting/) |
+| 010 | Mid-stream timeout cooldown | 2026-02-08 | 8b15fc1 | [010-mid-stream-timeout-cooldown](./quick/010-mid-stream-timeout-cooldown/) |
 
 ## Session Continuity
 
 Last session: 2026-02-08
-Stopped at: Completed quick task 009
+Stopped at: Completed quick task 010
 Resume file: None
 
 Config:
