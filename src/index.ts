@@ -47,7 +47,11 @@ logger.level = config.settings.logLevel;
 
 const registry = buildRegistry(config.providers);
 const chains = buildChains(config, registry);
-const tracker = new RateLimitTracker(config.settings.cooldownDefaultMs);
+const tracker = new RateLimitTracker(
+  config.settings.cooldownDefaultMs,
+  config.settings.midStreamFailureThreshold,
+  config.settings.midStreamCooldownMs,
+);
 
 // --- Register manual rate limits from config ---
 

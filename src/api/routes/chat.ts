@@ -139,6 +139,9 @@ export function createChatRoutes(
               // Write the final [DONE] marker to the client
               await stream.writeSSE({ data: '[DONE]' });
 
+              // Reset mid-stream failure counter on successful completion
+              tracker.resetMidStreamFailures(streamResult.providerId, streamResult.model);
+
               // Fire-and-forget: log streaming request with captured usage
               const streamLatencyMs = performance.now() - streamStart;
               setImmediate(() => {
@@ -184,6 +187,9 @@ export function createChatRoutes(
             },
             `Mid-stream error from ${streamResult.providerId}/${streamResult.model}: ${errorMessage} (stream will close, client must retry)`,
           );
+
+          // Record mid-stream failure for cooldown tracking
+          tracker.recordMidStreamFailure(streamResult.providerId, streamResult.model);
 
           try {
             await stream.writeSSE({
