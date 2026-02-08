@@ -49,8 +49,8 @@ export function createChatRoutes(
     const chain = resolveChain(chainName, chains, defaultChainName);
 
     logger.info(
-      { requestedModel, chain: chain.name },
-      `Chat completion request using chain "${chain.name}"`,
+      { requestedModel, chain: chain.name, stream: !!body.stream },
+      `Chat completion request (model="${requestedModel}" -> chain="${chain.name}"${body.stream ? ', streaming' : ''})`,
     );
 
     // Streaming branch
