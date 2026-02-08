@@ -1,4 +1,6 @@
 # 429chain configuration
+# Requests waterfall through chain entries on 429/rate-limit errors.
+# Free providers are tried first; paid providers serve as fallbacks.
 version: 1
 
 settings:
@@ -6,50 +8,85 @@ settings:
   apiKeys:
     - "your-proxy-api-key-here"  # API key(s) that clients use to access this proxy
   defaultChain: "default"
-  logLevel: info
-  cooldownDefaultMs: 60000       # Default cooldown on 429 (ms)
+  logLevel: info                 # trace | debug | info | warn | error | fatal
+  cooldownDefaultMs: 60000       # Default cooldown on 429 when no retry-after header (ms)
   requestTimeoutMs: 30000        # Global default timeout for upstream requests (ms). Per-provider timeout overrides this.
   normalizeResponses: false      # Move reasoning_content to content for reasoning models (e.g. DeepSeek R1)
+                                 # Set to true if your client doesn't handle reasoning_content
+
+# ──────────────────────────────────────────────
+# Providers
+# ──────────────────────────────────────────────
+# Supported types: openrouter, groq, cerebras, openai, generic-openai
+# Each type has a default baseUrl — only override if using a proxy or custom endpoint.
+# Per-provider `timeout` (ms) overrides settings.requestTimeoutMs for that provider.
+# Timeouts trigger waterfall to the next provider (no cooldown — transient, not a rate limit).
 
 providers:
+  # --- Free-tier providers ---
+
   - id: openrouter
     name: OpenRouter
     type: openrouter
     apiKey: "sk-or-v1-your-key-here"
-    # baseUrl defaults to https://openrouter.ai/api/v1
+    # baseUrl: "https://openrouter.ai/api/v1"  # default
 
   - id: groq
     name: Groq
     type: groq
     apiKey: "gsk_your-key-here"
-    # baseUrl defaults to https://api.groq.com/openai/v1
-    timeout: 10000  # Per-provider timeout (ms). Falls back to settings.requestTimeoutMs if omitted
-    # Optional: manual rate limits as fallback when provider headers unavailable
-    rateLimits:
+    # baseUrl: "https://api.groq.com/openai/v1"  # default
+    timeout: 10000  # Groq is fast — short timeout, waterfall quickly on slowdown
+    rateLimits:     # Manual fallback when provider headers are unavailable
       requestsPerMinute: 30    # Groq free tier: 30 RPM
       tokensPerMinute: 15000   # Groq free tier: ~15k TPM
       # requestsPerDay: 14400  # Optional daily limit
-      # concurrentRequests: 1  # Optional concurrent limit (enforcement deferred)
 
   - id: cerebras
     name: Cerebras
     type: cerebras
     apiKey: "csk-your-key-here"
-    # baseUrl defaults to https://api.cerebras.ai/v1
+    # baseUrl: "https://api.cerebras.ai/v1"  # default
+    timeout: 15000
+
+  # --- Paid providers (fallback) ---
 
   - id: openai
     name: OpenAI
     type: openai
     apiKey: "sk-your-openai-key-here"
-    # baseUrl defaults to https://api.openai.com/v1
+    # baseUrl: "https://api.openai.com/v1"  # default
+    # No timeout override — uses settings.requestTimeoutMs (30s)
 
   - id: moonshot
     name: Moonshot
-    type: generic-openai
+    type: generic-openai          # Any OpenAI-compatible API works with generic-openai
     apiKey: "sk-your-moonshot-key-here"
-    baseUrl: "https://api.moonshot.ai/v1"
+    baseUrl: "https://api.moonshot.ai/v1"  # Required for generic-openai (no default)
+
+  # --- More generic-openai examples ---
+  # - id: together
+  #   name: Together AI
+  #   type: generic-openai
+  #   apiKey: "your-together-key"
+  #   baseUrl: "https://api.together.xyz/v1"
+  #   timeout: 20000
+
+  # - id: deepinfra
+  #   name: DeepInfra
+  #   type: generic-openai
+  #   apiKey: "your-deepinfra-key"
+  #   baseUrl: "https://api.deepinfra.com/v1/openai"
+
+# ──────────────────────────────────────────────
+# Chains
+# ──────────────────────────────────────────────
+# Each chain is a prioritized list of provider+model pairs.
+# On 429/rate-limit/timeout, the next entry is tried automatically.
+# Clients select a chain by setting `model` in the request body to the chain name.
 
 chains:
+  # General-purpose chain: free tiers first, paid fallback last
   - name: default
     entries:
       - provider: openrouter
@@ -63,9 +100,31 @@ chains:
       - provider: moonshot       # paid fallback
         model: "kimi-k2-0711-preview"
 
+  # Speed-optimized chain: fastest inference providers only
   - name: fast
     entries:
       - provider: groq
         model: "llama-3.1-8b-instant"
       - provider: cerebras
         model: "llama-3.1-8b"
+
+  # # Reasoning chain: for models that use reasoning_content
+  # # Tip: set normalizeResponses: true in settings if your client expects content only
+  # - name: reasoning
+  #   entries:
+  #     - provider: openrouter
+  #       model: "deepseek/deepseek-r1:free"
+  #     - provider: groq
+  #       model: "deepseek-r1-distill-llama-70b"
+  #     - provider: openai
+  #       model: "o4-mini"
+
+  # # Large model chain: most capable models as fallbacks
+  # - name: large
+  #   entries:
+  #     - provider: openrouter
+  #       model: "meta-llama/llama-3.1-70b-instruct:free"
+  #     - provider: groq
+  #       model: "llama-3.3-70b-versatile"
+  #     - provider: openai
+  #       model: "gpt-4o"
