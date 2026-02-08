@@ -11,7 +11,7 @@ See: .planning/PROJECT.md (updated 2026-02-06)
 
 Milestone: v1.0 MVP (shipped 2026-02-06)
 Status: Complete
-Last activity: 2026-02-08 - Completed quick task 010: Mid-stream timeout cooldown
+Last activity: 2026-02-09 - Completed quick task 011: Dashboard enhancements
 
 Progress: [█████████████████████] 100%
 
@@ -144,11 +144,12 @@ None yet.
 | 008 | Normalize reasoning_content for reasoning models | 2026-02-08 | 45c393e | [008-normalize-reasoning-content](./quick/008-normalize-reasoning-content/) |
 | 009 | Improve terminal log formatting | 2026-02-08 | d9fcee3 | [009-improve-terminal-log-formatting](./quick/009-improve-terminal-log-formatting/) |
 | 010 | Mid-stream timeout cooldown | 2026-02-08 | 8b15fc1 | [010-mid-stream-timeout-cooldown](./quick/010-mid-stream-timeout-cooldown/) |
+| 011 | Dashboard enhancements | 2026-02-09 | 8bcc48a | [011-dashboard-enhancements](./quick/011-dashboard-enhancements/) |
 
 ## Session Continuity
 
-Last session: 2026-02-08
-Stopped at: Completed quick task 010
+Last session: 2026-02-09
+Stopped at: Completed quick task 011
 Resume file: None
 
 Config:
