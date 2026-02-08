@@ -1,6 +1,45 @@
 # 429chain Usage Guide
 
-Complete reference for installing, configuring, and using 429chain — an OpenAI-compatible proxy that waterfalls requests through provider chains on rate limits.
+Complete reference for installing, configuring, and using 429chain.
+
+## What is 429chain?
+
+429chain is an OpenAI-compatible proxy that ensures your requests never fail due to rate limits. It sits between your application and multiple LLM providers, automatically waterfalling through a prioritized chain of providers when one returns a 429 (rate limit), 402 (payment required), or times out.
+
+**The problem:** Free-tier LLM providers have strict rate limits. When you hit a limit on one provider, your request fails — even though other providers still have capacity.
+
+**The solution:** 429chain tries each provider in your chain sequentially. If the first provider is rate-limited, it instantly falls through to the next. Your application sees a single OpenAI-compatible API and never knows a failover happened.
+
+### How it works
+
+1. Your app sends a standard OpenAI chat completion request to 429chain
+2. 429chain tries the first provider in the chain
+3. If that provider returns 429, 402, or times out — it tries the next
+4. The first successful response is returned to your app
+5. Rate limit headers are tracked per provider+model so exhausted providers are skipped proactively
+
+### Key features
+
+- **OpenAI-compatible API** — drop-in replacement, works with any OpenAI SDK or client
+- **Provider chains** — prioritized list of provider+model pairs, free tiers first, paid fallbacks last
+- **Automatic rate limit tracking** — parses provider rate limit headers, skips exhausted providers without wasting a request
+- **Manual rate limits** — configure limits as fallback when providers don't send headers
+- **Per-provider timeouts** — slow providers waterfall without cooldown (transient, not a rate limit)
+- **Streaming support** — SSE streaming works through the proxy, including waterfall on mid-stream failures
+- **Response normalization** — optionally moves `reasoning_content` to `content` for reasoning models (e.g. DeepSeek R1)
+- **Web UI** — manage config, view request logs/stats, and test chains from the browser
+- **Docker support** — single-container deployment with SQLite persistence
+- **Chain test endpoint** — test every provider in a chain individually to verify connectivity
+
+### Architecture
+
+```
+Your App  →  429chain proxy  →  Provider A (429!)
+                             →  Provider B (429!)
+                             →  Provider C (200 ✓) → Response
+```
+
+Providers are configured with types: `openrouter`, `groq`, `cerebras`, `openai`, or `generic-openai` (any OpenAI-compatible API). Each type knows how to parse that provider's specific rate limit headers.
 
 ## 1. Quick Start
 
