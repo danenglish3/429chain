@@ -29,6 +29,12 @@ function formatNumber(num: number): string {
 }
 
 export default function Dashboard() {
+  const summaryStatsQuery = useQuery({
+    queryKey: queryKeys.summaryStats,
+    queryFn: api.getSummaryStats,
+    refetchInterval: 5000,
+  });
+
   const providerStatsQuery = useQuery({
     queryKey: queryKeys.providerStats,
     queryFn: api.getProviderStats,
@@ -39,15 +45,53 @@ export default function Dashboard() {
     queryFn: api.getChainStats,
   });
 
+  const summaryStats = summaryStatsQuery.data?.summary || { totalRequests: 0, waterfallRequests: 0, avgLatencyMs: 0 };
   const providerStats = providerStatsQuery.data?.providers || [];
   const chainStats = chainStatsQuery.data?.chains || [];
 
-  const isLoading = providerStatsQuery.isLoading || chainStatsQuery.isLoading;
-  const error = providerStatsQuery.error || chainStatsQuery.error;
+  const isLoading = summaryStatsQuery.isLoading || providerStatsQuery.isLoading || chainStatsQuery.isLoading;
+  const error = summaryStatsQuery.error || providerStatsQuery.error || chainStatsQuery.error;
+
+  const waterfallPercent = summaryStats.totalRequests > 0
+    ? ((summaryStats.waterfallRequests / summaryStats.totalRequests) * 100).toFixed(1)
+    : '0.0';
 
   return (
     <div className={styles.container}>
       <h1 className={styles.pageTitle}>Dashboard</h1>
+
+      {/* Section 0: Overview */}
+      <section className={styles.section}>
+        <h2 className={styles.sectionTitle}>Overview</h2>
+
+        {isLoading && <div className={styles.loading}>Loading usage data...</div>}
+
+        {error && (
+          <div className={styles.error}>
+            Error loading usage data: {error instanceof Error ? error.message : 'Unknown error'}
+          </div>
+        )}
+
+        {!isLoading && !error && (
+          <div className={styles.overviewGrid}>
+            <StatsCard
+              title="Total Requests"
+              value={formatNumber(summaryStats.totalRequests)}
+              subtitle=""
+            />
+            <StatsCard
+              title="Waterfalled"
+              value={formatNumber(summaryStats.waterfallRequests)}
+              subtitle={`${waterfallPercent}% of requests`}
+            />
+            <StatsCard
+              title="Avg Latency"
+              value={`${summaryStats.avgLatencyMs}ms`}
+              subtitle=""
+            />
+          </div>
+        )}
+      </section>
 
       {/* Section 1: Usage Summary */}
       <section className={styles.section}>

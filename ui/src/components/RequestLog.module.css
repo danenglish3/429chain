@@ -111,3 +111,66 @@
   border-radius: 8px;
   border: 1px dashed #dddddd;
 }
+
+.expandIcon {
+  width: 30px;
+  text-align: center;
+  color: #888888;
+  font-size: 10px;
+}
+
+.waterfallBadge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background-color: #fff3cd;
+  color: #856404;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.expandedRow {
+  background-color: #f8f9fa;
+}
+
+.expandedContent {
+  padding: 16px;
+  padding-left: 46px;
+}
+
+.detailGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+.detailItem {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.detailLabel {
+  font-size: 11px;
+  text-transform: uppercase;
+  color: #666666;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.detailValue {
+  font-size: 16px;
+  font-weight: 600;
+  font-family: 'Courier New', monospace;
+  color: #1a1a1a;
+}
+
+.waterfallNote {
+  background-color: #fff3cd;
+  color: #856404;
+  padding: 12px;
+  border-radius: 6px;
+  margin-bottom: 16px;
+  font-size: 14px;
+  border-left: 4px solid #ffc107;
+}
