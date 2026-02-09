@@ -423,6 +423,10 @@ Please make sure tests pass before submitting:
 npm test
 ```
 
+## Built With
+
+This project was built entirely with [Claude Code](https://docs.anthropic.com/en/docs/claude-code) and the [Get Shit Done (GSD)](https://github.com/gsd-framework/gsd) plugin &mdash; an agentic workflow framework for Claude Code that handles planning, execution, and verification of complex software projects.
+
 ## License
 
 [MIT](LICENSE)
