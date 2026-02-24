@@ -12,6 +12,7 @@ import { GroqAdapter } from './adapters/groq.js';
 import { CerebrasAdapter } from './adapters/cerebras.js';
 import { OpenAIAdapter } from './adapters/openai.js';
 import { GenericOpenAIAdapter } from './adapters/generic-openai.js';
+import { GoogleAIAdapter } from './adapters/google-ai.js';
 
 /** Registry of provider adapters, keyed by provider ID. */
 export class ProviderRegistry implements IProviderRegistry {
@@ -120,10 +121,12 @@ export function createAdapter(config: ProviderConfig): ProviderAdapter {
         );
       }
       return new GenericOpenAIAdapter(config.id, config.name, config.apiKey, config.baseUrl, config.timeout);
+    case 'google-ai':
+      return new GoogleAIAdapter(config.id, config.name, config.apiKey, config.baseUrl, config.timeout);
     default:
       throw new ConfigError(
         `Unknown provider type '${config.type}' for provider '${config.id}'. ` +
-        `Supported types: openrouter, groq, cerebras, openai, generic-openai`,
+        `Supported types: openrouter, groq, cerebras, openai, generic-openai, google-ai`,
       );
   }
 }
