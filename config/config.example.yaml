@@ -17,7 +17,7 @@ settings:
 # ──────────────────────────────────────────────
 # Providers
 # ──────────────────────────────────────────────
-# Supported types: openrouter, groq, cerebras, openai, generic-openai
+# Supported types: openrouter, groq, cerebras, openai, generic-openai, google-ai
 # Each type has a default baseUrl — only override if using a proxy or custom endpoint.
 # Per-provider `timeout` (ms) overrides settings.requestTimeoutMs for that provider.
 # Timeouts trigger waterfall to the next provider (no cooldown — transient, not a rate limit).
@@ -63,6 +63,12 @@ providers:
     type: generic-openai          # Any OpenAI-compatible API works with generic-openai
     apiKey: "sk-your-moonshot-key-here"
     baseUrl: "https://api.moonshot.ai/v1"  # Required for generic-openai (no default)
+
+  - id: google-ai
+    name: Google AI Studio
+    type: google-ai
+    apiKey: "your-google-api-key-here"  # Get from https://aistudio.google.com/app/apikey
+    # baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai"  # default
 
   # --- More generic-openai examples ---
   # - id: together
