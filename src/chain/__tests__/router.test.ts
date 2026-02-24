@@ -73,6 +73,14 @@ function createRateLimitAdapter(
   id: string,
   retryAfterSeconds?: number,
 ): ProviderAdapter {
+  // Mock response body matching OpenAI-style error format
+  const responseBody = JSON.stringify({
+    error: {
+      type: 'rate_limit_error',
+      message: 'Rate limit exceeded',
+    },
+  });
+
   return {
     id,
     providerType: 'test',
@@ -83,14 +91,14 @@ function createRateLimitAdapter(
       if (retryAfterSeconds !== undefined) {
         headers.set('retry-after', String(retryAfterSeconds));
       }
-      throw new ProviderRateLimitError(id, 'test-model', headers);
+      throw new ProviderRateLimitError(id, 'test-model', headers, responseBody);
     }),
     chatCompletionStream: vi.fn(async () => {
       const headers = new Headers();
       if (retryAfterSeconds !== undefined) {
         headers.set('retry-after', String(retryAfterSeconds));
       }
-      throw new ProviderRateLimitError(id, 'test-model', headers);
+      throw new ProviderRateLimitError(id, 'test-model', headers, responseBody);
     }),
     parseRateLimitHeaders: vi.fn(() => null),
     getExtraHeaders: () => ({}),
@@ -214,7 +222,7 @@ describe('executeChain', () => {
     expect(result.providerId).toBe('provider-b');
     expect(result.model).toBe('model-2');
     expect(result.attempts).toHaveLength(1);
-    expect(result.attempts[0]!.error).toBe('429_rate_limited');
+    expect(result.attempts[0]!.error).toBe('429_rate_limit');
     expect(result.attempts[0]!.retryAfter).toBe(30_000); // 30 seconds in ms
     expect(adapter1.chatCompletion).toHaveBeenCalledTimes(1);
     expect(adapter2.chatCompletion).toHaveBeenCalledTimes(1);
@@ -313,7 +321,7 @@ describe('executeChain', () => {
       expect(exhaustedError.attempts).toHaveLength(2);
 
       expect(exhaustedError.attempts[0]!.provider).toBe('provider-a');
-      expect(exhaustedError.attempts[0]!.error).toBe('429_rate_limited');
+      expect(exhaustedError.attempts[0]!.error).toBe('429_rate_limit');
 
       expect(exhaustedError.attempts[1]!.provider).toBe('provider-b');
       expect(exhaustedError.attempts[1]!.error).toContain('500');

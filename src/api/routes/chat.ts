@@ -8,8 +8,9 @@ import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import { logger } from '../../shared/logger.js';
 import { executeChain, executeStreamChain, resolveChain } from '../../chain/router.js';
-import { AllProvidersExhaustedError } from '../../shared/errors.js';
+import { AllProvidersExhaustedError, StreamIdleTimeoutError } from '../../shared/errors.js';
 import { createSSEParser } from '../../streaming/sse-parser.js';
+import { createIdleTimeout } from '../../streaming/idle-timeout.js';
 import { RequestLogger } from '../../persistence/request-logger.js';
 import { normalizeResponse, normalizeChunk } from '../../shared/normalize.js';
 import type { Chain, StreamChainResult } from '../../chain/types.js';
@@ -26,6 +27,7 @@ import type { ChatCompletionRequest, Usage } from '../../shared/types.js';
  * @param requestLogger - Request logger for observability.
  * @param globalTimeoutMs - Global timeout in milliseconds for upstream requests.
  * @param normalizeResponses - If true, move reasoning_content to content for reasoning models.
+ * @param streamIdleTimeoutMs - Max ms between chunks before a stream is considered stalled.
  * @returns Hono app with POST /chat/completions route.
  */
 export function createChatRoutes(
@@ -36,6 +38,7 @@ export function createChatRoutes(
   requestLogger: RequestLogger,
   globalTimeoutMs: number,
   normalizeResponses: boolean,
+  streamIdleTimeoutMs: number,
 ) {
   const app = new Hono();
 
@@ -128,15 +131,21 @@ export function createChatRoutes(
         let capturedUsage: Usage | null = null;
         const streamStart = performance.now();
 
+        const idle = createIdleTimeout(
+          streamIdleTimeoutMs,
+          new StreamIdleTimeoutError(streamResult.providerId, streamResult.model, streamIdleTimeoutMs),
+        );
+
         try {
           const reader = streamResult.response.body!.getReader();
           const decoder = new TextDecoder();
           const parser = createSSEParser();
 
           while (true) {
-            const { done, value } = await reader.read();
+            const { done, value } = await Promise.race([reader.read(), idle.promise]);
             if (done) break;
 
+            idle.reset();
             const chunk = decoder.decode(value, { stream: true });
             const result = parser.parse(chunk);
 
@@ -188,6 +197,58 @@ export function createChatRoutes(
             }
           }
         } catch (error: unknown) {
+          if (error instanceof StreamIdleTimeoutError) {
+            const streamLatencyMs = performance.now() - streamStart;
+            logger.warn(
+              {
+                provider: streamResult.providerId,
+                model: streamResult.model,
+                chain: chain.name,
+                idleTimeoutMs: streamIdleTimeoutMs,
+                latencyMs: Math.round(streamLatencyMs),
+                code: 'stream_idle_timeout',
+              },
+              `Stream idle timeout from ${streamResult.providerId}/${streamResult.model} (no data for ${streamIdleTimeoutMs}ms)`,
+            );
+
+            tracker.recordMidStreamFailure(streamResult.providerId, streamResult.model);
+
+            setImmediate(() => {
+              try {
+                requestLogger.logRequest({
+                  timestamp: Date.now(),
+                  chainName: chain.name,
+                  providerId: streamResult.providerId,
+                  model: streamResult.model,
+                  promptTokens: capturedUsage?.prompt_tokens ?? 0,
+                  completionTokens: capturedUsage?.completion_tokens ?? 0,
+                  totalTokens: capturedUsage?.total_tokens ?? 0,
+                  latencyMs: streamLatencyMs,
+                  httpStatus: 504,
+                  attempts: streamResult.attempts.length + 1,
+                  errorMessage: error.message,
+                });
+              } catch (logError) {
+                logger.error({ error: logError }, 'Failed to log idle timeout request');
+              }
+            });
+
+            try {
+              await stream.writeSSE({
+                event: 'error',
+                data: JSON.stringify({
+                  error: {
+                    message: `Stream idle timeout: no data received for ${streamIdleTimeoutMs}ms from ${streamResult.providerId}/${streamResult.model}`,
+                    type: 'server_error',
+                    code: 'stream_idle_timeout',
+                  },
+                }),
+              });
+            } catch {
+              // Client already gone
+            }
+            return;
+          }
           if (error instanceof Error && error.name === 'AbortError') {
             // Client disconnected -- clean exit, no error logging
             logger.debug(
@@ -249,6 +310,8 @@ export function createChatRoutes(
           } catch {
             // If we can't even write the error event, client is gone -- nothing to do
           }
+        } finally {
+          idle.clear();
         }
       });
     }

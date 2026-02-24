@@ -70,3 +70,18 @@ export class AllProvidersExhaustedError extends Error {
     };
   }
 }
+
+/** Thrown when no data arrives on a stream for longer than the idle timeout. */
+export class StreamIdleTimeoutError extends Error {
+  public readonly providerId: string;
+  public readonly model: string;
+  public readonly idleTimeoutMs: number;
+
+  constructor(providerId: string, model: string, idleTimeoutMs: number) {
+    super(`Stream idle timeout after ${idleTimeoutMs}ms from ${providerId}/${model}`);
+    this.name = 'StreamIdleTimeoutError';
+    this.providerId = providerId;
+    this.model = model;
+    this.idleTimeoutMs = idleTimeoutMs;
+  }
+}

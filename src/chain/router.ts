@@ -19,6 +19,142 @@ import type { ProviderRegistry } from '../providers/types.js';
 import type { RateLimitTracker } from '../ratelimit/tracker.js';
 import type { Chain, ChainResult, StreamChainResult } from './types.js';
 
+interface RateLimitDetails {
+  type: string; // e.g., 'rate_limit', 'tokens_limit', 'requests_limit', 'unknown'
+  message: string; // truncated provider message for logging
+  reason: string; // full reason string for cooldown tracking
+  rawSnippet?: string; // raw response snippet for debugging generic messages
+}
+
+/**
+ * Parse rate limit details from provider error response body.
+ * Different providers return different formats, this attempts to extract useful info.
+ */
+function parseRateLimitDetails(responseBody: string): RateLimitDetails {
+  if (!responseBody) {
+    return { type: 'unknown', message: '', reason: '429 rate limited' };
+  }
+
+  try {
+    const parsed = JSON.parse(responseBody);
+
+    // OpenRouter format: { error: { code: number, message: string, metadata?: { ... } } }
+    // OpenAI format: { error: { type: string, code: string, message: string } }
+    const error = parsed.error || parsed;
+    const code = error.code || error.type || '';
+    let message = error.message || '';
+    const metadata = error.metadata || {};
+
+    // If message is generic, try to extract more from metadata
+    const isGenericMessage = !message ||
+      message === 'Provider returned error' ||
+      message === 'Rate limit exceeded' ||
+      message.length < 20;
+
+    // OpenRouter may have raw upstream error in metadata
+    if (isGenericMessage && metadata.raw) {
+      const rawMsg = typeof metadata.raw === 'string' ? metadata.raw : JSON.stringify(metadata.raw);
+      message = rawMsg.slice(0, 200);
+    }
+
+    // Check for upstream provider error details
+    if (isGenericMessage && metadata.upstream_error) {
+      message = String(metadata.upstream_error).slice(0, 200);
+    }
+
+    // Detect rate limit type from code or message
+    let type = 'rate_limit';
+    const lowerCode = String(code).toLowerCase();
+    const lowerMessage = message.toLowerCase();
+
+    if (lowerCode.includes('token') || lowerMessage.includes('token')) {
+      type = 'tokens_limit';
+    } else if (lowerCode.includes('request') || lowerMessage.includes('requests')) {
+      type = 'requests_limit';
+    } else if (lowerMessage.includes('credit') || lowerMessage.includes('quota')) {
+      type = 'credits_exhausted';
+    } else if (metadata.provider_name) {
+      // OpenRouter passes through upstream provider info
+      type = `provider_${metadata.provider_name}`;
+    }
+
+    // Truncate message for logging (max 150 chars)
+    const truncatedMessage = message.length > 150 ? message.slice(0, 150) + '...' : message;
+
+    // Include raw snippet when message is still generic for debugging
+    const result: RateLimitDetails = {
+      type,
+      message: truncatedMessage,
+      reason: `429 ${type}: ${truncatedMessage}`,
+    };
+
+    // Add raw snippet for debugging when message is unhelpful
+    if (truncatedMessage === 'Provider returned error' || truncatedMessage.length < 20) {
+      result.rawSnippet = responseBody.slice(0, 300);
+    }
+
+    return result;
+  } catch {
+    // Not JSON or parse failed - use raw body snippet
+    const snippet = responseBody.slice(0, 100);
+    return {
+      type: 'unknown',
+      message: snippet,
+      reason: `429 rate limited: ${snippet}`,
+    };
+  }
+}
+
+interface ErrorDetails {
+  message: string; // parsed error message
+  rawSnippet?: string; // raw response for debugging
+}
+
+/**
+ * Parse error details from provider error response body.
+ * Used for non-429 errors (400, 500, etc.)
+ */
+function parseErrorDetails(responseBody: string): ErrorDetails {
+  if (!responseBody) {
+    return { message: '' };
+  }
+
+  try {
+    const parsed = JSON.parse(responseBody);
+    const error = parsed.error || parsed;
+    let message = error.message || '';
+    const metadata = error.metadata || {};
+
+    // Try to get more details from metadata if message is generic
+    if (!message || message === 'Provider returned error' || message.length < 15) {
+      if (metadata.raw) {
+        const rawMsg = typeof metadata.raw === 'string' ? metadata.raw : JSON.stringify(metadata.raw);
+        message = rawMsg.slice(0, 200);
+      } else if (metadata.upstream_error) {
+        message = String(metadata.upstream_error).slice(0, 200);
+      }
+    }
+
+    // Truncate message for logging (max 200 chars)
+    const truncatedMessage = message.length > 200 ? message.slice(0, 200) + '...' : message;
+
+    const result: ErrorDetails = { message: truncatedMessage };
+
+    // Add raw snippet when message is still unhelpful
+    if (!truncatedMessage || truncatedMessage === 'Provider returned error' || truncatedMessage.length < 15) {
+      result.rawSnippet = responseBody.slice(0, 300);
+    }
+
+    return result;
+  } catch {
+    // Not JSON - return raw snippet
+    return {
+      message: responseBody.slice(0, 100),
+      rawSnippet: responseBody.slice(0, 300),
+    };
+  }
+}
+
 /**
  * Execute a chain: iterate entries in order, skip exhausted providers,
  * waterfall on any failure, return first success.
@@ -119,11 +255,14 @@ export async function executeChain(
           }
         }
 
+        // Parse rate limit details from provider response
+        const rateLimitDetails = parseRateLimitDetails(error.responseBody);
+
         tracker.markExhausted(
           entry.providerId,
           entry.model,
           retryAfterMs,
-          '429 rate limited',
+          rateLimitDetails.reason,
         );
 
         logger.info(
@@ -133,15 +272,18 @@ export async function executeChain(
             chain: chain.name,
             latencyMs: Math.round(latencyMs),
             retryAfterMs,
+            rateLimitType: rateLimitDetails.type,
+            rateLimitMessage: rateLimitDetails.message,
+            ...(rateLimitDetails.rawSnippet && { rawResponse: rateLimitDetails.rawSnippet }),
             next: nextEntry ? `${nextEntry.providerId}/${nextEntry.model}` : null,
           },
-          `Provider ${entry.providerId}/${entry.model} returned 429, waterfalling${nextHint}`,
+          `Provider ${entry.providerId}/${entry.model} returned 429 (${rateLimitDetails.type}), waterfalling${nextHint}`,
         );
 
         attempts.push({
           provider: entry.providerId,
           model: entry.model,
-          error: '429_rate_limited',
+          error: `429_${rateLimitDetails.type}`,
           retryAfter: retryAfterMs,
         });
         continue;
@@ -158,6 +300,9 @@ export async function executeChain(
           );
         }
 
+        // Parse error details from response body
+        const errorDetails = parseErrorDetails(error.responseBody);
+
         // Non-429 provider error (5xx, 402, etc.): waterfall to next
         logger.info(
           {
@@ -165,6 +310,8 @@ export async function executeChain(
             model: entry.model,
             chain: chain.name,
             statusCode: error.statusCode,
+            errorMessage: errorDetails.message,
+            ...(errorDetails.rawSnippet && { rawResponse: errorDetails.rawSnippet }),
             latencyMs: Math.round(latencyMs),
             next: nextEntry ? `${nextEntry.providerId}/${nextEntry.model}` : null,
           },
@@ -174,7 +321,7 @@ export async function executeChain(
         attempts.push({
           provider: entry.providerId,
           model: entry.model,
-          error: `${error.statusCode}: ${error.message}`,
+          error: `${error.statusCode}: ${errorDetails.message || error.message}`,
         });
         continue;
       }
@@ -283,18 +430,26 @@ export async function executeStreamChain(
 
     const adapter = registry.get(entry.providerId);
 
-    // Create combined signal: timeout + client abort signal
+    // Create connection-only timeout: clears once the stream opens.
+    // The per-chunk idle timeout in the relay loop takes over for body streaming.
     const timeoutMs = adapter.timeout ?? globalTimeoutMs;
-    let effectiveSignal = signal;
+    const connectionAbort = new AbortController();
+    let connectionTimer: ReturnType<typeof setTimeout> | null = null;
     if (timeoutMs) {
-      const timeoutSignal = AbortSignal.timeout(timeoutMs);
-      effectiveSignal = signal
-        ? AbortSignal.any([timeoutSignal, signal])
-        : timeoutSignal;
+      connectionTimer = setTimeout(() => {
+        connectionAbort.abort(new DOMException('The operation was aborted due to timeout', 'TimeoutError'));
+      }, timeoutMs);
     }
+
+    const effectiveSignal = signal
+      ? AbortSignal.any([connectionAbort.signal, signal])
+      : connectionAbort.signal;
 
     try {
       const response = await adapter.chatCompletionStream(entry.model, request, effectiveSignal);
+
+      // Stream opened — clear the connection timeout so it doesn't kill body streaming
+      if (connectionTimer) clearTimeout(connectionTimer);
 
       // Parse rate limit headers from streaming response (headers available before body consumed)
       const rateLimitInfo = adapter.parseRateLimitHeaders(response.headers);
@@ -321,6 +476,7 @@ export async function executeStreamChain(
         attempts,
       };
     } catch (error: unknown) {
+      if (connectionTimer) clearTimeout(connectionTimer);
       // Timeout: waterfall WITHOUT cooldown (must check BEFORE AbortError)
       if (error instanceof Error && error.name === 'TimeoutError') {
         const timeoutMs = adapter.timeout ?? globalTimeoutMs;
@@ -352,11 +508,14 @@ export async function executeStreamChain(
           }
         }
 
+        // Parse rate limit details from provider response
+        const rateLimitDetails = parseRateLimitDetails(error.responseBody);
+
         tracker.markExhausted(
           entry.providerId,
           entry.model,
           retryAfterMs,
-          '429 rate limited (streaming)',
+          rateLimitDetails.reason,
         );
 
         logger.info(
@@ -365,15 +524,18 @@ export async function executeStreamChain(
             model: entry.model,
             chain: chain.name,
             retryAfterMs,
+            rateLimitType: rateLimitDetails.type,
+            rateLimitMessage: rateLimitDetails.message,
+            ...(rateLimitDetails.rawSnippet && { rawResponse: rateLimitDetails.rawSnippet }),
             next: nextEntry ? `${nextEntry.providerId}/${nextEntry.model}` : null,
           },
-          `Provider ${entry.providerId}/${entry.model} returned 429 [stream], waterfalling${nextHint}`,
+          `Provider ${entry.providerId}/${entry.model} returned 429 [stream] (${rateLimitDetails.type}), waterfalling${nextHint}`,
         );
 
         attempts.push({
           provider: entry.providerId,
           model: entry.model,
-          error: '429_rate_limited',
+          error: `429_${rateLimitDetails.type}`,
           retryAfter: retryAfterMs,
         });
         continue;
@@ -390,12 +552,17 @@ export async function executeStreamChain(
           );
         }
 
+        // Parse error details from response body
+        const errorDetails = parseErrorDetails(error.responseBody);
+
         logger.info(
           {
             provider: entry.providerId,
             model: entry.model,
             chain: chain.name,
             statusCode: error.statusCode,
+            errorMessage: errorDetails.message,
+            ...(errorDetails.rawSnippet && { rawResponse: errorDetails.rawSnippet }),
             next: nextEntry ? `${nextEntry.providerId}/${nextEntry.model}` : null,
           },
           `Provider ${entry.providerId}/${entry.model} returned ${error.statusCode} [stream], waterfalling${nextHint}`,
@@ -403,7 +570,7 @@ export async function executeStreamChain(
         attempts.push({
           provider: entry.providerId,
           model: entry.model,
-          error: `${error.statusCode}: ${error.message}`,
+          error: `${error.statusCode}: ${errorDetails.message || error.message}`,
         });
         continue;
       }

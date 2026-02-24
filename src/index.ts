@@ -111,6 +111,7 @@ const chatRoutes = createChatRoutes(
   requestLogger,
   config.settings.requestTimeoutMs,
   config.settings.normalizeResponses,
+  config.settings.streamIdleTimeoutMs,
 );
 const modelsRoutes = createModelsRoutes(chains);
 const statsRoutes = createStatsRoutes(aggregator);

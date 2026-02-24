@@ -49,6 +49,7 @@ export const SettingsSchema = z.object({
   logLevel: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
   cooldownDefaultMs: z.number().int().min(1000).default(60000),
   requestTimeoutMs: z.number().int().min(1000).default(30000),
+  streamIdleTimeoutMs: z.number().int().min(1000).default(30000),
   dbPath: z.string().default('./data/observability.db'),
   normalizeResponses: z.boolean().default(false),
   midStreamFailureThreshold: z.number().int().min(1).default(3),
