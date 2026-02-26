@@ -41,6 +41,7 @@ export class RateLimitTracker {
   private manualLimits = new Map<string, ManualLimitState>();
   private midStreamFailures = new Map<string, number>();
   private midStreamEscalation = new Map<string, number>();
+  private onAvailableCallback?: (providerId: string, model: string) => void;
 
   /**
    * @param defaultCooldownMs - Default cooldown duration when no retry-after
@@ -57,6 +58,14 @@ export class RateLimitTracker {
   ) {
     this.defaultCooldownMs = defaultCooldownMs;
     this.cooldownManager = new CooldownManager();
+  }
+
+  /**
+   * Register a callback to be fired whenever a provider+model pair becomes available.
+   * Used by queue mode to trigger drain when a cooldown expires.
+   */
+  setOnAvailableCallback(callback: (providerId: string, model: string) => void): void {
+    this.onAvailableCallback = callback;
   }
 
   /** Build the composite key for a provider+model pair. */
@@ -144,6 +153,11 @@ export class RateLimitTracker {
       { providerId, model },
       `Provider ${providerId}/${model} available again`,
     );
+
+    // Notify queue that a provider is available for draining
+    if (this.onAvailableCallback) {
+      this.onAvailableCallback(providerId, model);
+    }
   }
 
   /**
