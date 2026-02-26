@@ -61,9 +61,11 @@ describe('RequestQueue', () => {
       const queue = new RequestQueue(100);
       const callOrder: string[] = [];
 
-      const executeA = vi.fn().mockImplementation(async () => {
+      // Use a deferred promise to control when executeA resolves
+      let resolveA!: (v: string) => void;
+      const executeA = vi.fn().mockImplementation(() => {
         callOrder.push('A');
-        return 'resultA';
+        return new Promise<string>((res) => { resolveA = res; });
       });
       const executeB = vi.fn().mockImplementation(async () => {
         callOrder.push('B');
@@ -73,10 +75,16 @@ describe('RequestQueue', () => {
       queue.enqueue('chain-a', executeA, 30_000);
       queue.enqueue('chain-a', executeB, 30_000);
 
-      await queue.drainOne('chain-a');
+      // Start draining — executeA is called but not yet resolved
+      const drainPromise = queue.drainOne('chain-a');
 
+      // executeA has been called but B has not yet (A is still pending)
       expect(callOrder[0]).toBe('A');
       expect(executeB).not.toHaveBeenCalled();
+
+      // Now resolve A and wait for drain to complete
+      resolveA('resultA');
+      await drainPromise;
     });
   });
 
@@ -116,12 +124,14 @@ describe('RequestQueue', () => {
       const promiseA = queue.enqueue('chain-a', executeA, 30_000);
       const promiseB = queue.enqueue('chain-a', executeB, 30_000);
 
+      // drainOne will: reject A, then queue a microtask to drain B
       await queue.drainOne('chain-a');
 
       await expect(promiseA).rejects.toBe(genericError);
 
-      // Give microtask queue time to process the next drain
-      await new Promise(resolve => setImmediate(resolve));
+      // Flush microtask queue to allow the continuation drain of B to run
+      await Promise.resolve();
+      await Promise.resolve();
       await expect(promiseB).resolves.toBe('resultB');
     });
   });
