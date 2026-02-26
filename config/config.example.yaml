@@ -14,6 +14,12 @@ settings:
   normalizeResponses: false      # Move reasoning_content to content for reasoning models (e.g. DeepSeek R1)
                                  # Set to true if your client doesn't handle reasoning_content
 
+  # Queue mode: hold requests when all providers exhausted instead of returning 503
+  # When enabled, requests wait for a provider to come off cooldown, then retry automatically
+  # queueMode: false           # Enable/disable queue mode (default: false)
+  # queueMaxWaitMs: 300000     # Max time a request waits in queue (default: 5 minutes)
+  # queueMaxSize: 100          # Max queued requests per chain (default: 100)
+
 # ──────────────────────────────────────────────
 # Providers
 # ──────────────────────────────────────────────
