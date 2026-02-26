@@ -55,6 +55,9 @@ export const SettingsSchema = z.object({
   midStreamFailureThreshold: z.number().int().min(1).default(3),
   midStreamCooldownMs: z.number().int().min(1000).default(120000),
   midStreamCooldownMaxMs: z.number().int().min(1000).default(1800000),
+  queueMode: z.boolean().default(false),
+  queueMaxWaitMs: z.number().int().min(1000).default(300_000),
+  queueMaxSize: z.number().int().min(1).default(100),
 });
 
 /** Top-level config schema with cross-reference validation. */

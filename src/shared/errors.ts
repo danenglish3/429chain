@@ -71,6 +71,73 @@ export class AllProvidersExhaustedError extends Error {
   }
 }
 
+/** Thrown when a queued request exceeds the maximum wait time. */
+export class QueueTimeoutError extends Error {
+  public readonly chainName: string;
+  public readonly maxWaitMs: number;
+
+  constructor(chainName: string, maxWaitMs: number) {
+    super(`Queue timeout after ${maxWaitMs}ms for chain "${chainName}"`);
+    this.name = 'QueueTimeoutError';
+    this.chainName = chainName;
+    this.maxWaitMs = maxWaitMs;
+  }
+
+  toOpenAIError(): OpenAIErrorResponse {
+    return {
+      error: {
+        message: this.message,
+        type: 'server_error',
+        param: null,
+        code: 'queue_timeout',
+      },
+    };
+  }
+}
+
+/** Thrown when the queue for a chain is at maximum capacity. */
+export class QueueFullError extends Error {
+  public readonly chainName: string;
+  public readonly maxSize: number;
+
+  constructor(chainName: string, maxSize: number) {
+    super(`Queue full (${maxSize} items) for chain "${chainName}"`);
+    this.name = 'QueueFullError';
+    this.chainName = chainName;
+    this.maxSize = maxSize;
+  }
+
+  toOpenAIError(): OpenAIErrorResponse {
+    return {
+      error: {
+        message: this.message,
+        type: 'server_error',
+        param: null,
+        code: 'queue_full',
+      },
+    };
+  }
+}
+
+/** Thrown when the server is shutting down and queued requests are rejected. */
+export class QueueShutdownError extends Error {
+  constructor() {
+    super('Server shutting down, queued request rejected');
+    this.name = 'QueueShutdownError';
+  }
+
+  toOpenAIError(): OpenAIErrorResponse {
+    return {
+      error: {
+        message: this.message,
+        type: 'server_error',
+        param: null,
+        code: 'queue_shutdown',
+      },
+    };
+  }
+}
+
 /** Thrown when no data arrives on a stream for longer than the idle timeout. */
 export class StreamIdleTimeoutError extends Error {
   public readonly providerId: string;
