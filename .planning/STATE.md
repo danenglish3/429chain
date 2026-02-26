@@ -9,9 +9,9 @@ See: .planning/PROJECT.md (updated 2026-02-06)
 
 ## Current Position
 
-Milestone: v1.0 MVP (shipped 2026-02-06)
-Status: Complete
-Last activity: 2026-02-09 - Completed quick task 011: Dashboard enhancements
+Milestone: Phase 8 - Queue Mode (started 2026-02-27)
+Status: In Progress (08-01 complete)
+Last activity: 2026-02-27 - Completed 08-01: RequestQueue core (types, errors, config schema, RequestQueue class)
 
 Progress: [█████████████████████] 100%
 
@@ -33,6 +33,7 @@ Progress: [█████████████████████] 100%
 | 5 - Web UI | 6/6 | ~45min | ~7.5min |
 | 6 - Docker Deployment | 3/3 | ~8min | ~2.7min |
 | 7 - CLI Support | 3/3 | ~10.4min | ~3.5min |
+| Phase 08-queue-mode P01 | 5 | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -116,11 +117,15 @@ Recent decisions affecting current work:
 - [d073] Moonshot as generic-openai example (fully compatible, no custom headers)
 - [d074] Mid-stream failure tracking with consecutive failure counter: after N failures (default 3), provider+model enters cooldown (default 30s)
 - [d075] AbortError (client disconnect) does NOT count as mid-stream failure - only real provider errors trigger counter
+- [Phase 08-queue-mode]: Settled flag on QueueItem prevents double-resolve/reject races between timeout and drain
+- [Phase 08-queue-mode]: AllProvidersExhaustedError stops drain (chain still exhausted, item stays); other errors reject and continue
+- [Phase 08-queue-mode]: queueMicrotask for continuation drain avoids synchronous recursion
 
 ### Roadmap Evolution
 
 - Phase 7 added: CLI support (run via npx/global install)
 - Phase 7 complete: All 7 phases done
+- Phase 8 added: Queue mode for requests when all providers exhausted
 
 ### Pending Todos
 
@@ -148,8 +153,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-09
-Stopped at: Completed quick task 011
+Last session: 2026-02-27
+Stopped at: Completed 08-01-PLAN.md (RequestQueue core - queue types, errors, config schema, RequestQueue class)
 Resume file: None
 
 Config:
