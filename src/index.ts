@@ -27,6 +27,8 @@ import { createStatsRoutes } from './api/routes/stats.js';
 import { createRateLimitRoutes } from './api/routes/ratelimits.js';
 import { createAdminRoutes } from './api/routes/admin.js';
 import { createTestRoutes } from './api/routes/test.js';
+import { RequestQueue } from './queue/request-queue.js';
+import { QueueShutdownError } from './shared/errors.js';
 
 // --- Bootstrap ---
 
@@ -81,6 +83,40 @@ if (manualLimitCount > 0) {
   logger.info({ count: manualLimitCount }, `Registered ${manualLimitCount} manual rate limit(s)`);
 }
 
+// --- Conditionally create request queue ---
+
+const queue = config.settings.queueMode
+  ? new RequestQueue(config.settings.queueMaxSize)
+  : undefined;
+
+if (queue) {
+  logger.info(
+    { maxWaitMs: config.settings.queueMaxWaitMs, maxSize: config.settings.queueMaxSize },
+    'Queue mode enabled',
+  );
+
+  // Build lookup: providerKey -> Set<chainName>
+  const providerToChains = new Map<string, Set<string>>();
+  for (const [chainName, chain] of chains) {
+    for (const entry of chain.entries) {
+      const key = `${entry.providerId}:${entry.model}`;
+      if (!providerToChains.has(key)) {
+        providerToChains.set(key, new Set());
+      }
+      providerToChains.get(key)!.add(chainName);
+    }
+  }
+
+  tracker.setOnAvailableCallback((providerId, model) => {
+    const key = `${providerId}:${model}`;
+    const chainNames = providerToChains.get(key);
+    if (chainNames) {
+      logger.debug({ providerId, model, chains: [...chainNames] }, `Provider available, draining queues`);
+      queue.drainChains([...chainNames]);
+    }
+  });
+}
+
 // --- Initialize observability database ---
 const db = initializeDatabase(config.settings.dbPath);
 migrateSchema(db);
@@ -112,10 +148,12 @@ const chatRoutes = createChatRoutes(
   config.settings.requestTimeoutMs,
   config.settings.normalizeResponses,
   config.settings.streamIdleTimeoutMs,
+  queue,
+  config.settings.queueMaxWaitMs,
 );
 const modelsRoutes = createModelsRoutes(chains);
 const statsRoutes = createStatsRoutes(aggregator);
-const rateLimitRoutes = createRateLimitRoutes(tracker, chains);
+const rateLimitRoutes = createRateLimitRoutes(tracker, chains, queue);
 const adminRoutes = createAdminRoutes({
   configRef,
   configPath,
@@ -181,6 +219,10 @@ const server = serve(
 
 const shutdown = () => {
   logger.info('Shutting down...');
+  if (queue) {
+    queue.rejectAll(new QueueShutdownError());
+    logger.info('Rejected all queued requests');
+  }
   tracker.shutdown();
   db.close();
   logger.info('Database closed');

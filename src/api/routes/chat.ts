@@ -8,12 +8,13 @@ import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import { logger } from '../../shared/logger.js';
 import { executeChain, executeStreamChain, resolveChain } from '../../chain/router.js';
-import { AllProvidersExhaustedError, StreamIdleTimeoutError } from '../../shared/errors.js';
+import { AllProvidersExhaustedError, StreamIdleTimeoutError, QueueTimeoutError, QueueFullError } from '../../shared/errors.js';
 import { createSSEParser } from '../../streaming/sse-parser.js';
 import { createIdleTimeout } from '../../streaming/idle-timeout.js';
 import { RequestLogger } from '../../persistence/request-logger.js';
 import { normalizeResponse, normalizeChunk } from '../../shared/normalize.js';
-import type { Chain, StreamChainResult } from '../../chain/types.js';
+import { RequestQueue } from '../../queue/request-queue.js';
+import type { Chain, ChainResult, StreamChainResult } from '../../chain/types.js';
 import type { RateLimitTracker } from '../../ratelimit/tracker.js';
 import type { ProviderRegistry } from '../../providers/types.js';
 import type { ChatCompletionRequest, Usage } from '../../shared/types.js';
@@ -39,6 +40,8 @@ export function createChatRoutes(
   globalTimeoutMs: number,
   normalizeResponses: boolean,
   streamIdleTimeoutMs: number,
+  queue?: RequestQueue,
+  queueMaxWaitMs?: number,
 ) {
   const app = new Hono();
 
@@ -108,9 +111,27 @@ export function createChatRoutes(
               logger.error({ error: logError }, 'Failed to log exhausted request');
             }
           });
-          return c.json(error.toOpenAIError(), 503);
+
+          if (queue && queueMaxWaitMs) {
+            logger.info({ chain: chain.name }, `All providers exhausted (stream), queuing request for chain "${chain.name}"`);
+            try {
+              streamResult = await queue.enqueue(
+                chain.name,
+                () => executeStreamChain(chain, streamRequest, tracker, registry, abortController.signal, globalTimeoutMs),
+                queueMaxWaitMs,
+              ) as StreamChainResult;
+            } catch (queueError) {
+              if (queueError instanceof QueueTimeoutError || queueError instanceof QueueFullError) {
+                return c.json(queueError.toOpenAIError(), 503);
+              }
+              throw queueError;
+            }
+          } else {
+            return c.json(error.toOpenAIError(), 503);
+          }
+        } else {
+          throw error;
         }
-        throw error;
       }
 
       // Set informational headers
@@ -350,8 +371,27 @@ export function createChatRoutes(
             logger.error({ error: logError }, 'Failed to log exhausted request');
           }
         });
+
+        if (queue && queueMaxWaitMs) {
+          logger.info({ chain: chain.name }, `All providers exhausted, queuing request for chain "${chain.name}"`);
+          try {
+            result = await queue.enqueue(
+              chain.name,
+              () => executeChain(chain, cleanBody as ChatCompletionRequest, tracker, registry, globalTimeoutMs),
+              queueMaxWaitMs,
+            ) as ChainResult;
+          } catch (queueError) {
+            if (queueError instanceof QueueTimeoutError || queueError instanceof QueueFullError) {
+              return c.json(queueError.toOpenAIError(), 503);
+            }
+            throw queueError;
+          }
+        } else {
+          throw error;
+        }
+      } else {
+        throw error;
       }
-      throw error;
     }
 
     // Set informational headers

@@ -6,14 +6,16 @@
 import { Hono } from 'hono';
 import type { RateLimitTracker } from '../../ratelimit/tracker.js';
 import type { Chain } from '../../chain/types.js';
+import type { RequestQueue } from '../../queue/request-queue.js';
 
 /**
  * Create rate limit routes with injected tracker dependency.
  * @param tracker - RateLimitTracker instance for reading live rate limit state.
  * @param chains - Map of chain name to Chain object for computing active entries.
+ * @param queue - Optional RequestQueue for reporting queue stats.
  * @returns Hono sub-app with rate limit endpoints.
  */
-export function createRateLimitRoutes(tracker: RateLimitTracker, chains: Map<string, Chain>) {
+export function createRateLimitRoutes(tracker: RateLimitTracker, chains: Map<string, Chain>, queue?: RequestQueue) {
   const app = new Hono();
 
   // GET / - All rate limit statuses
@@ -49,6 +51,7 @@ export function createRateLimitRoutes(tracker: RateLimitTracker, chains: Map<str
           : null,
       })),
       activeEntries,
+      queue: queue ? queue.getStats() : [],
     });
   });
 
