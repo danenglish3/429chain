@@ -9,9 +9,9 @@ See: .planning/PROJECT.md (updated 2026-02-06)
 
 ## Current Position
 
-Milestone: Phase 8 - Queue Mode (started 2026-02-27)
-Status: In Progress (08-01, 08-02 complete)
-Last activity: 2026-02-27 - Completed 08-02: Queue wiring - tracker callback, chat route enqueue, ratelimits stats, shutdown
+Milestone: Phase 8 - Queue Mode (completed 2026-02-27)
+Status: Complete (verified 17/17 must-haves)
+Last activity: 2026-02-27 - Phase 8 complete: Queue mode for requests when all providers exhausted
 
 Progress: [█████████████████████] 100%
 
@@ -133,6 +133,7 @@ Recent decisions affecting current work:
 - Phase 7 added: CLI support (run via npx/global install)
 - Phase 7 complete: All 7 phases done
 - Phase 8 added: Queue mode for requests when all providers exhausted
+- Phase 8 complete: 3/3 plans, verified 17/17 must-haves
 
 ### Pending Todos
 
@@ -161,7 +162,7 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-27
-Stopped at: Completed 08-02-PLAN.md (Queue wiring - tracker callback, chat route enqueue, ratelimits stats, shutdown integration)
+Stopped at: Phase 8 complete — queue mode shipped
 Resume file: None
 
 Config:

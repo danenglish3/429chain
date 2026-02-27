@@ -32,19 +32,19 @@ See: `.planning/milestones/v1.0-ROADMAP.md` for full details.
 | 5. Web UI | v1.0 | 6/6 | Complete | 2026-02-06 |
 | 6. Docker Deployment | v1.0 | 3/3 | Complete | 2026-02-06 |
 | 7. CLI Support | v1.0 | 3/3 | Complete | 2026-02-06 |
-| 8. Queue Mode | — | 0/3 | Planned | — |
+| 8. Queue Mode | — | 3/3 | Complete | 2026-02-27 |
 
 ### Phase 8: Queue mode for requests when all providers exhausted
 
 **Goal:** Add FIFO queue mode so requests wait for provider cooldowns instead of immediately failing with "All providers exhausted"
 **Depends on:** v1.0 complete
-**Plans:** 3 plans
+**Plans:** 3/3 complete
 
 Plans:
-- [ ] 08-01-PLAN.md — TDD RequestQueue class with types, errors, config schema
-- [ ] 08-02-PLAN.md — Wire queue into tracker, chat routes, ratelimits, index.ts, shutdown
-- [ ] 08-03-PLAN.md — Update config example and API documentation
+- [x] 08-01-PLAN.md — TDD RequestQueue class with types, errors, config schema
+- [x] 08-02-PLAN.md — Wire queue into tracker, chat routes, ratelimits, index.ts, shutdown
+- [x] 08-03-PLAN.md — Update config example and API documentation
 
 ---
 *Roadmap created: 2026-02-05*
-*Last updated: 2026-02-27 after phase 8 planning*
+*Last updated: 2026-02-27 after phase 8 complete*
