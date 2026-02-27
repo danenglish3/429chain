@@ -10,8 +10,8 @@ See: .planning/PROJECT.md (updated 2026-02-06)
 ## Current Position
 
 Milestone: Phase 8 - Queue Mode (started 2026-02-27)
-Status: In Progress (08-01 complete)
-Last activity: 2026-02-27 - Completed 08-03: Config example and API docs with queue mode documentation
+Status: In Progress (08-01, 08-02 complete)
+Last activity: 2026-02-27 - Completed 08-02: Queue wiring - tracker callback, chat route enqueue, ratelimits stats, shutdown
 
 Progress: [█████████████████████] 100%
 
@@ -34,7 +34,9 @@ Progress: [█████████████████████] 100%
 | 6 - Docker Deployment | 3/3 | ~8min | ~2.7min |
 | 7 - CLI Support | 3/3 | ~10.4min | ~3.5min |
 | Phase 08-queue-mode P01 | 5 | 2 tasks | 5 files |
+| Phase 08-queue-mode P02 | 6 | 2 tasks | 5 files |
 | Phase 08-queue-mode P03 | 2 | 1 tasks | 2 files |
+| Phase 08-queue-mode P02 | 6 | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -122,6 +124,9 @@ Recent decisions affecting current work:
 - [Phase 08-queue-mode]: AllProvidersExhaustedError stops drain (chain still exhausted, item stays); other errors reject and continue
 - [Phase 08-queue-mode]: queueMicrotask for continuation drain avoids synchronous recursion
 - [Phase 08-queue-mode]: Created docs/API.md as dedicated API quick-reference separate from USAGE.md; queue settings in config.example.yaml kept commented out matching optional settings pattern
+- [Phase 08-queue-mode]: Provider-to-chains lookup built at startup O(1) for onAvailable callback
+- [Phase 08-queue-mode]: Queue wiring is additive — all existing behavior unchanged when queueMode disabled
+- [Phase 08-queue-mode]: Shutdown ordering: queue.rejectAll before tracker.shutdown
 
 ### Roadmap Evolution
 
@@ -156,7 +161,7 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-27
-Stopped at: Completed 08-03-PLAN.md (Config example + API docs with queue mode documentation)
+Stopped at: Completed 08-02-PLAN.md (Queue wiring - tracker callback, chat route enqueue, ratelimits stats, shutdown integration)
 Resume file: None
 
 Config:
