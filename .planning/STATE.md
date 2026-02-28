@@ -2,22 +2,24 @@
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-02-06)
+See: .planning/PROJECT.md (updated 2026-03-01)
 
 **Core value:** Requests never fail due to rate limits when free tokens exist somewhere in the chain
-**Current focus:** v1.1 SaaS Ready — multi-tenant with Supabase Auth + Postgres
+**Current focus:** v1.1 SaaS Ready — Phase 9: Dual-Mode Repository Abstraction
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-03-01 — Milestone v1.1 SaaS Ready started
+Phase: 9 of 14 (Dual-Mode Repository Abstraction)
+Plan: 0 of ? in current phase
+Status: Ready to plan
+Last activity: 2026-03-01 — v1.1 roadmap created (phases 9-14), 30/30 requirements mapped
+
+Progress: [████████░░░░░░░░░░░░] 40% (8 of ~14 phases complete, v1.1 not started)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 26
+- Total plans completed: 26 (phases 1-8)
 - Average duration: ~5.0 minutes
 - Total execution time: ~131.4 minutes
 
@@ -32,10 +34,7 @@ Last activity: 2026-03-01 — Milestone v1.1 SaaS Ready started
 | 5 - Web UI | 6/6 | ~45min | ~7.5min |
 | 6 - Docker Deployment | 3/3 | ~8min | ~2.7min |
 | 7 - CLI Support | 3/3 | ~10.4min | ~3.5min |
-| Phase 08-queue-mode P01 | 5 | 2 tasks | 5 files |
-| Phase 08-queue-mode P02 | 6 | 2 tasks | 5 files |
-| Phase 08-queue-mode P03 | 2 | 1 tasks | 2 files |
-| Phase 08-queue-mode P02 | 6 | 2 tasks | 5 files |
+| 8 - Queue Mode | 3/3 | ~15min | ~5min |
 
 ## Accumulated Context
 
@@ -44,95 +43,21 @@ Last activity: 2026-03-01 — Milestone v1.1 SaaS Ready started
 Decisions are logged in PROJECT.md Key Decisions table.
 Recent decisions affecting current work:
 
-- [d001] Use Zod v4 with z.prettifyError() for config validation errors
-- [d002] ESM-only project with NodeNext module resolution
-- [d003] Pino logger with path-based redaction configured at import time
-- [d004] Composite key ${providerId}:${model} for per-provider+model rate limit tracking
-- [d005] Timer.unref() on cooldown timers to prevent keeping process alive during shutdown
-- [d006] Race condition safety: isExhausted double-checks cooldownUntil timestamp
-- [d007] Route factory pattern: route creators take dependencies and return Hono sub-apps
-- [d008] Selective auth via Hono sub-app mounting: /health public, /v1/* protected
-- [d009] Model field as chain name hint: model field selects chain if name matches
-- [d010] chatCompletionStream returns raw Response (not ProviderResponse) for unconsumed ReadableStream
-- [d011] SSE parser factory pattern with stateful buffer encapsulation
-- [d012] prepareRequestBody called first, then stream:true override (preserves body prep logic)
-- [d013] executeStreamChain happens OUTSIDE streamSSE() so all-exhausted returns JSON 503 error not empty stream
-- [d014] Definite assignment assertion on streamResult (catch block always exits via return/throw)
-- [d015] AbortError handled silently (debug log) vs real errors (error log + error event)
-- [d016] Three-state rate limit model: 'tracking' state added between 'available' and 'exhausted'
-- [d017] Proactive exhaustion when remainingRequests === 0 OR remainingTokens === 0
-- [d018] Math.max of reset times when both request and token limits hit zero (longest wait wins)
-- [d019] QuotaInfo includes lastUpdated timestamp for future staleness detection
-- [d020] Streaming Response headers parsed before body consumption for quota tracking
-- [d021] Both executeChain and executeStreamChain call tracker.updateQuota() after success
-- [d022] Research Open Question #4 resolved: streaming responses parse headers proactively
-- [d023] Manual rate limits optional per provider in config - existing configs without rateLimits still validate
-- [d024] Manual limits only enforced when no headers present - header-based tracking takes precedence
-- [d025] Window-based counter resets: track windowStart timestamp, reset when elapsed time exceeds window duration
-- [d026] Manual limits registered only for provider+model pairs found in chains (not all possible combinations)
-- [d027] Manual limit registration happens after tracker creation but before server starts
-- [d028] Manual limit count logged at startup for configuration visibility
-- [d029] SQLite with WAL mode for observability persistence (concurrent reads during writes, file-based deployment simplicity)
-- [d030] Materialized aggregation tables with SQLite triggers (O(1) stats reads, no application-level aggregation)
-- [d031] Fire-and-forget request logging with no error propagation (observability never fails proxy requests)
-- [d032] Timestamp stored as INTEGER (Unix epoch ms for efficient sorting and time-range queries)
-- [d033] setImmediate for fire-and-forget logging (schedules logging for next event loop tick, zero impact on response latency)
-- [d034] stream_options.include_usage for streaming token capture (OpenAI-compatible providers send usage in final chunk)
-- [d035] Try-catch around logRequest with error logging (observability never fails proxy requests)
-- [d036] performance.now() for streaming latency measurement (monotonic high-resolution time, accurate for latency tracking)
-- [d037] Admin routes use configRef wrapper ({ current: Config }) for mutable shared state
-- [d038] writeConfig serializes to YAML with 2-space indent matching loader expectations
-- [d039] DELETE /providers/:id validates no chains reference the provider before deletion
-- [d040] DELETE /chains/:name prevents default chain deletion (referential integrity)
-- [d041] PUT endpoints validate with Zod, return 400 with prettified errors on validation failure
-- [d042] Provider apiKey masked as "***" in GET responses for security
-- [d043] Vite proxy pattern: /v1/* and /health proxy to backend during dev (avoid CORS)
-- [d044] Backend serves SPA static files via serveStatic middleware (single-server deployment)
-- [d045] sessionStorage for API key (auto-clear on 401, survives page reload)
-- [d046] CSS Modules for component styles (scoped class names, type-safe)
-- [d047] Placeholder pages created upfront (router stable, pages implemented in later plans)
-- [d048] Two-click confirmation for destructive actions (Delete -> Confirm? pattern)
-- [d049] Query invalidation after mutations for automatic UI refresh
-- [d050] Show/hide toggle for sensitive input fields (API keys, passwords)
-- [d051] Server errors at form level, client validation errors at field level
-- [d052] Auto-save pattern: mutations fire immediately on user action, no explicit save button
-- [d053] Drag handle isolation: only handle triggers drag, not entire row
-- [d054] dnd-kit for drag-and-drop (DndContext + SortableContext + useSortable pattern)
-- [d055] Config bind mount writable (no :ro) to support admin API config writes
-- [d056] Named volume for entire /app/data directory (not individual .db file) for SQLite WAL mode
-- [d057] Optional .env file (required: false) allows running without environment file
-- [d058] Only functional environment variables documented in .env.example
-- [d059] Dockerfile CMD uses dist/index.mjs for ESM output (tsdown builds .mjs not .js)
-- [d060] parseArgs with strict:false allows unknown args to pass through without error
-- [d061] import.meta.url for CLI asset resolution (config.example.yaml location in packaged npm)
-- [d062] .gitattributes enforces LF line endings on dist/cli.mjs for cross-platform shebang compatibility
-- [d063] Split build scripts: build:backend (tsdown both entries) + build:ui (frontend) for explicit control
-- [d064] npm files whitelist includes dist/, ui/dist/, config/config.example.yaml for clean publishing
-- [d065] import.meta.url for static file resolution: fileURLToPath + dirname + join for absolute paths in ESM
-- [d066] console.error for pre-logger errors: config-not-found errors use console.error before logger init
-- [d067] PORT env var override: process.env.PORT takes precedence over config.settings.port for CLI --port flag
-- [d068] Per-provider timeout overrides global requestTimeoutMs (adapter.timeout ?? globalTimeoutMs pattern)
-- [d069] Timeout waterfalls WITHOUT cooldown (transient error, not a rate limit - no markExhausted call)
-- [d070] TimeoutError check BEFORE AbortError in streaming (Node 20+ distinct error types from AbortSignal.timeout)
-- [d071] Extract parseDurationToMs to shared utils.ts for Groq and OpenAI rate limit parsing
-- [d072] OpenAI as first-class provider type vs generic-openai (Go duration parsing for 6 headers)
-- [d073] Moonshot as generic-openai example (fully compatible, no custom headers)
-- [d074] Mid-stream failure tracking with consecutive failure counter: after N failures (default 3), provider+model enters cooldown (default 30s)
-- [d075] AbortError (client disconnect) does NOT count as mid-stream failure - only real provider errors trigger counter
-- [Phase 08-queue-mode]: Settled flag on QueueItem prevents double-resolve/reject races between timeout and drain
-- [Phase 08-queue-mode]: AllProvidersExhaustedError stops drain (chain still exhausted, item stays); other errors reject and continue
-- [Phase 08-queue-mode]: queueMicrotask for continuation drain avoids synchronous recursion
-- [Phase 08-queue-mode]: Created docs/API.md as dedicated API quick-reference separate from USAGE.md; queue settings in config.example.yaml kept commented out matching optional settings pattern
-- [Phase 08-queue-mode]: Provider-to-chains lookup built at startup O(1) for onAvailable callback
-- [Phase 08-queue-mode]: Queue wiring is additive — all existing behavior unchanged when queueMode disabled
-- [Phase 08-queue-mode]: Shutdown ordering: queue.rejectAll before tracker.shutdown
+- [v1.1 arch]: Dual-mode via APP_MODE env var — self-hosted=SQLite+API key, saas=Supabase Auth+Postgres
+- [v1.1 arch]: Repository pattern — IAdminRepository + IStatsRepository interfaces; factory selects at startup
+- [v1.1 arch]: Supabase imports must be dynamic and isolated to src/persistence/repositories/supabase/ only
+- [v1.1 arch]: Dual Supabase client pattern — service-role for writes (explicit user_id), user-scoped for reads (RLS enforces isolation)
+- [v1.1 arch]: jose v6 (not Hono built-in JWT) for asymmetric JWKS verification — Supabase projects post-May 2025 use RSA keys
+- [v1.1 arch]: postgres driver (postgres.js v3, session pooler URL) — not pg; ESM-native, Supabase-recommended
+- [v1.1 arch]: AES-256-GCM or Supabase Vault for BYOK key encryption — commit to one in Phase 10 plan
+- [v1.1 arch]: SaaS chat path loads providers/chains per-request from Postgres (with LRU cache, 60s TTL) — in-memory Maps cannot serve multiple tenants
+- [v1.1 arch]: @supabase/ssr explicitly NOT used — this is a Vite SPA, not an SSR framework
 
 ### Roadmap Evolution
 
-- Phase 7 added: CLI support (run via npx/global install)
-- Phase 7 complete: All 7 phases done
-- Phase 8 added: Queue mode for requests when all providers exhausted
-- Phase 8 complete: 3/3 plans, verified 17/17 must-haves
+- Phases 1-7: v1.0 MVP shipped 2026-02-06
+- Phase 8: Queue mode shipped 2026-02-27
+- Phases 9-14: v1.1 SaaS Ready roadmap created 2026-03-01
 
 ### Pending Todos
 
@@ -140,39 +65,28 @@ None yet.
 
 ### Blockers/Concerns
 
-None yet.
+- [Phase 10]: Encryption approach not yet decided (Supabase Vault vs AES-256-GCM with ENCRYPTION_KEY env var) — commit in Phase 10 plan before writing migrations
+- [Phase 12]: SaaS chat path per-request loading and LRU cache design is non-trivial — plan must specify cache key, TTL, max size, invalidation triggers (on provider upsert/delete), and cold-start behavior
+- [Phase 12]: getClaims() vs getUser() per-request decision pending — getUser() is more secure (network call), getClaims() is faster (local); decide in Phase 12 plan given proxy latency sensitivity
 
 ### Quick Tasks Completed
 
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
-| 001 | Usage docs for CLI and swagger-style API reference | 2026-02-07 | fd44832 | [001-usage-docs-cli-swagger](./quick/001-usage-docs-cli-swagger/) |
-| 002 | Fix float retry-after parsing and add 402 cooldown | 2026-02-08 | 74be681 | [002-verify-429-handling-providers](./quick/002-verify-429-handling-providers/) |
-| 003 | Adapter unit tests (40 tests for all adapters + BaseAdapter) | 2026-02-08 | e51c2ca | [003-adapter-unit-tests](./quick/003-adapter-unit-tests/) |
-| 004 | Provider adapter creation guide (docs/PROVIDERS.md) | 2026-02-08 | c65698f | [004-provider-adapter-creation-guides](./quick/004-provider-adapter-creation-guides/) |
-| 005 | Per-provider timeout with waterfall, no cooldown | 2026-02-08 | 1b91e1d | [005-per-provider-timeout-waterfall](./quick/005-per-provider-timeout-waterfall/) |
-| 006 | OpenAI provider + Moonshot generic-openai example | 2026-02-08 | c2e7307 | [006-add-openai-moonshot-providers](./quick/006-add-openai-moonshot-providers/) |
-| 007 | Documentation update and chain test feature | 2026-02-08 | 46a8da6 | [007-docs-update-chain-test-feature](./quick/007-docs-update-chain-test-feature/) |
-| 008 | Normalize reasoning_content for reasoning models | 2026-02-08 | 45c393e | [008-normalize-reasoning-content](./quick/008-normalize-reasoning-content/) |
-| 009 | Improve terminal log formatting | 2026-02-08 | d9fcee3 | [009-improve-terminal-log-formatting](./quick/009-improve-terminal-log-formatting/) |
-| 010 | Mid-stream timeout cooldown | 2026-02-08 | 8b15fc1 | [010-mid-stream-timeout-cooldown](./quick/010-mid-stream-timeout-cooldown/) |
-| 011 | Dashboard enhancements | 2026-02-09 | 8bcc48a | [011-dashboard-enhancements](./quick/011-dashboard-enhancements/) |
+| 001 | Usage docs for CLI and swagger-style API reference | 2026-02-07 | fd44832 | [001](./quick/001-usage-docs-cli-swagger/) |
+| 002 | Fix float retry-after parsing and add 402 cooldown | 2026-02-08 | 74be681 | [002](./quick/002-verify-429-handling-providers/) |
+| 003 | Adapter unit tests (40 tests for all adapters + BaseAdapter) | 2026-02-08 | e51c2ca | [003](./quick/003-adapter-unit-tests/) |
+| 004 | Provider adapter creation guide (docs/PROVIDERS.md) | 2026-02-08 | c65698f | [004](./quick/004-provider-adapter-creation-guides/) |
+| 005 | Per-provider timeout with waterfall, no cooldown | 2026-02-08 | 1b91e1d | [005](./quick/005-per-provider-timeout-waterfall/) |
+| 006 | OpenAI provider + Moonshot generic-openai example | 2026-02-08 | c2e7307 | [006](./quick/006-add-openai-moonshot-providers/) |
+| 007 | Documentation update and chain test feature | 2026-02-08 | 46a8da6 | [007](./quick/007-docs-update-chain-test-feature/) |
+| 008 | Normalize reasoning_content for reasoning models | 2026-02-08 | 45c393e | [008](./quick/008-normalize-reasoning-content/) |
+| 009 | Improve terminal log formatting | 2026-02-08 | d9fcee3 | [009](./quick/009-improve-terminal-log-formatting/) |
+| 010 | Mid-stream timeout cooldown | 2026-02-08 | 8b15fc1 | [010](./quick/010-mid-stream-timeout-cooldown/) |
+| 011 | Dashboard enhancements | 2026-02-09 | 8bcc48a | [011](./quick/011-dashboard-enhancements/) |
 
 ## Session Continuity
 
-Last session: 2026-02-27
-Stopped at: Phase 8 complete — queue mode shipped
+Last session: 2026-03-01
+Stopped at: v1.1 roadmap created — phases 9-14 defined, 30/30 requirements mapped, ready to plan Phase 9
 Resume file: None
-
-Config:
-{
-  "mode": "yolo",
-  "depth": "standard",
-  "parallelization": true,
-  "commit_docs": true,
-  "workflow": {
-    "research": true,
-    "plan_check": true,
-    "verifier": true
-  }
-}
