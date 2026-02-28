@@ -4,34 +4,34 @@
  */
 
 import { Hono } from 'hono';
-import type { UsageAggregator } from '../../persistence/aggregator.js';
+import type { IStatsRepository } from '../../persistence/repositories/interfaces.js';
 
 /**
- * Create stats routes with injected aggregator dependency.
- * @param aggregator - UsageAggregator instance for reading materialized stats.
+ * Create stats routes with injected stats repository dependency.
+ * @param stats - IStatsRepository instance for reading materialized stats.
  * @returns Hono sub-app with stats endpoints.
  */
-export function createStatsRoutes(aggregator: UsageAggregator) {
+export function createStatsRoutes(stats: IStatsRepository) {
   const app = new Hono();
 
   // GET /summary - Summary statistics across all requests
   app.get('/summary', (c) => {
     return c.json({
-      summary: aggregator.getSummaryStats(),
+      summary: stats.getSummaryStats(),
     });
   });
 
   // GET /providers - All provider usage statistics
   app.get('/providers', (c) => {
     return c.json({
-      providers: aggregator.getAllProviderUsage(),
+      providers: stats.getAllProviderUsage(),
     });
   });
 
   // GET /providers/:providerId - Single provider usage statistics
   app.get('/providers/:providerId', (c) => {
     const providerId = c.req.param('providerId');
-    const usage = aggregator.getProviderUsage(providerId);
+    const usage = stats.getProviderUsage(providerId);
 
     if (usage === null) {
       return c.json(
@@ -46,14 +46,14 @@ export function createStatsRoutes(aggregator: UsageAggregator) {
   // GET /chains - All chain usage statistics
   app.get('/chains', (c) => {
     return c.json({
-      chains: aggregator.getAllChainUsage(),
+      chains: stats.getAllChainUsage(),
     });
   });
 
   // GET /chains/:chainName - Single chain usage statistics
   app.get('/chains/:chainName', (c) => {
     const chainName = c.req.param('chainName');
-    const usage = aggregator.getChainUsage(chainName);
+    const usage = stats.getChainUsage(chainName);
 
     if (usage === null) {
       return c.json(
@@ -72,7 +72,7 @@ export function createStatsRoutes(aggregator: UsageAggregator) {
     const cappedLimit = Math.min(limit, 500);
 
     return c.json({
-      requests: aggregator.getRecentRequests(cappedLimit),
+      requests: stats.getRecentRequests(cappedLimit),
     });
   });
 

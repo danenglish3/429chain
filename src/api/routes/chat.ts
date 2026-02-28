@@ -11,7 +11,7 @@ import { executeChain, executeStreamChain, resolveChain } from '../../chain/rout
 import { AllProvidersExhaustedError, StreamIdleTimeoutError, QueueTimeoutError, QueueFullError } from '../../shared/errors.js';
 import { createSSEParser } from '../../streaming/sse-parser.js';
 import { createIdleTimeout } from '../../streaming/idle-timeout.js';
-import { RequestLogger } from '../../persistence/request-logger.js';
+import type { IStatsRepository } from '../../persistence/repositories/interfaces.js';
 import { normalizeResponse, normalizeChunk } from '../../shared/normalize.js';
 import { RequestQueue } from '../../queue/request-queue.js';
 import type { Chain, ChainResult, StreamChainResult } from '../../chain/types.js';
@@ -25,7 +25,7 @@ import type { ChatCompletionRequest, Usage } from '../../shared/types.js';
  * @param tracker - Rate limit tracker instance.
  * @param registry - Provider adapter registry.
  * @param defaultChainName - Default chain name from config.
- * @param requestLogger - Request logger for observability.
+ * @param stats - Stats repository for request logging.
  * @param globalTimeoutMs - Global timeout in milliseconds for upstream requests.
  * @param normalizeResponses - If true, move reasoning_content to content for reasoning models.
  * @param streamIdleTimeoutMs - Max ms between chunks before a stream is considered stalled.
@@ -36,7 +36,7 @@ export function createChatRoutes(
   tracker: RateLimitTracker,
   registry: ProviderRegistry,
   defaultChainName: string,
-  requestLogger: RequestLogger,
+  stats: IStatsRepository,
   globalTimeoutMs: number,
   normalizeResponses: boolean,
   streamIdleTimeoutMs: number,
@@ -94,7 +94,7 @@ export function createChatRoutes(
           const lastAttempt = error.attempts[error.attempts.length - 1];
           setImmediate(() => {
             try {
-              requestLogger.logRequest({
+              stats.logRequest({
                 timestamp: Date.now(),
                 chainName: chain.name,
                 providerId: lastAttempt?.provider ?? 'unknown',
@@ -197,7 +197,7 @@ export function createChatRoutes(
               const streamLatencyMs = performance.now() - streamStart;
               setImmediate(() => {
                 try {
-                  requestLogger.logRequest({
+                  stats.logRequest({
                     timestamp: Date.now(),
                     chainName: chain.name,
                     providerId: streamResult.providerId,
@@ -236,7 +236,7 @@ export function createChatRoutes(
 
             setImmediate(() => {
               try {
-                requestLogger.logRequest({
+                stats.logRequest({
                   timestamp: Date.now(),
                   chainName: chain.name,
                   providerId: streamResult.providerId,
@@ -299,7 +299,7 @@ export function createChatRoutes(
           // Log the failed streaming request so it appears in the dashboard
           setImmediate(() => {
             try {
-              requestLogger.logRequest({
+              stats.logRequest({
                 timestamp: Date.now(),
                 chainName: chain.name,
                 providerId: streamResult.providerId,
@@ -354,7 +354,7 @@ export function createChatRoutes(
         const lastAttempt = error.attempts[error.attempts.length - 1];
         setImmediate(() => {
           try {
-            requestLogger.logRequest({
+            stats.logRequest({
               timestamp: Date.now(),
               chainName: chain.name,
               providerId: lastAttempt?.provider ?? 'unknown',
@@ -401,7 +401,7 @@ export function createChatRoutes(
     // Fire-and-forget: log request without blocking response
     setImmediate(() => {
       try {
-        requestLogger.logRequest({
+        stats.logRequest({
           timestamp: Date.now(),
           chainName: chain.name,
           providerId: result.providerId,
