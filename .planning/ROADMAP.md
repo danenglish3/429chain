@@ -40,7 +40,7 @@ Plans:
 
 **Milestone Goal:** Make 429chain deployable as a multi-tenant SaaS while preserving the existing self-hosted open-source experience.
 
-- [ ] **Phase 9: Dual-Mode Repository Abstraction** - Define repository interfaces, wrap SQLite behind them, add mode-switching factory
+- [x] **Phase 9: Dual-Mode Repository Abstraction** - Define repository interfaces, wrap SQLite behind them, add mode-switching factory (completed 2026-02-28)
 - [ ] **Phase 10: Postgres Schema and RLS** - Write Postgres migrations with tenant isolation policies and encrypted key storage
 - [ ] **Phase 11: Supabase Repository Implementations** - Implement Postgres-backed repositories and wire them into the factory
 - [ ] **Phase 12: Hono Auth Middleware and SaaS Route Wiring** - JWT validation middleware, per-tenant chat path, tenant API key resolution
@@ -139,7 +139,7 @@ Phases execute in numeric order: 9 → 10 → 11 → 12 → 13 → 14
 | 6. Docker Deployment | v1.0 | 3/3 | Complete | 2026-02-06 |
 | 7. CLI Support | v1.0 | 3/3 | Complete | 2026-02-06 |
 | 8. Queue Mode | — | 3/3 | Complete | 2026-02-27 |
-| 9. Dual-Mode Repository Abstraction | 1/2 | In Progress|  | - |
+| 9. Dual-Mode Repository Abstraction | 2/2 | Complete   | 2026-02-28 | - |
 | 10. Postgres Schema and RLS | v1.1 | 0/? | Not started | - |
 | 11. Supabase Repository Implementations | v1.1 | 0/? | Not started | - |
 | 12. Hono Auth Middleware and SaaS Route Wiring | v1.1 | 0/? | Not started | - |

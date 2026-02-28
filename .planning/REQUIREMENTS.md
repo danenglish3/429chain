@@ -9,8 +9,8 @@ Requirements for SaaS-ready milestone. Each maps to roadmap phases.
 
 ### Dual-Mode Architecture
 
-- [ ] **ARCH-01**: App initializes in self-hosted mode (SQLite, no auth) when APP_MODE is not set or set to "self-hosted"
-- [ ] **ARCH-02**: App initializes in SaaS mode (Supabase Auth + Postgres) when APP_MODE=saas with required env vars
+- [x] **ARCH-01**: App initializes in self-hosted mode (SQLite, no auth) when APP_MODE is not set or set to "self-hosted"
+- [x] **ARCH-02**: App initializes in SaaS mode (Supabase Auth + Postgres) when APP_MODE=saas with required env vars
 - [x] **ARCH-03**: Repository interfaces abstract all data access (providers, chains, usage, logs)
 - [x] **ARCH-04**: SQLite repository implementation wraps existing logic with no behavior change
 - [ ] **ARCH-05**: Supabase repository implementation uses Postgres with RLS-enforced tenant isolation
@@ -96,8 +96,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| ARCH-01 | Phase 9 | Pending |
-| ARCH-02 | Phase 9 | Pending |
+| ARCH-01 | Phase 9 | Complete |
+| ARCH-02 | Phase 9 | Complete |
 | ARCH-03 | Phase 9 | Complete |
 | ARCH-04 | Phase 9 | Complete |
 | ARCH-05 | Phase 11 | Pending |
