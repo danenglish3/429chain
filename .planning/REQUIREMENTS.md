@@ -11,11 +11,11 @@ Requirements for SaaS-ready milestone. Each maps to roadmap phases.
 
 - [ ] **ARCH-01**: App initializes in self-hosted mode (SQLite, no auth) when APP_MODE is not set or set to "self-hosted"
 - [ ] **ARCH-02**: App initializes in SaaS mode (Supabase Auth + Postgres) when APP_MODE=saas with required env vars
-- [ ] **ARCH-03**: Repository interfaces abstract all data access (providers, chains, usage, logs)
-- [ ] **ARCH-04**: SQLite repository implementation wraps existing logic with no behavior change
+- [x] **ARCH-03**: Repository interfaces abstract all data access (providers, chains, usage, logs)
+- [x] **ARCH-04**: SQLite repository implementation wraps existing logic with no behavior change
 - [ ] **ARCH-05**: Supabase repository implementation uses Postgres with RLS-enforced tenant isolation
-- [ ] **ARCH-06**: Repository factory selects implementation based on APP_MODE at startup
-- [ ] **ARCH-07**: Self-hosted mode has zero dependency on Supabase packages at runtime
+- [x] **ARCH-06**: Repository factory selects implementation based on APP_MODE at startup
+- [x] **ARCH-07**: Self-hosted mode has zero dependency on Supabase packages at runtime
 
 ### Authentication
 
@@ -98,11 +98,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 |-------------|-------|--------|
 | ARCH-01 | Phase 9 | Pending |
 | ARCH-02 | Phase 9 | Pending |
-| ARCH-03 | Phase 9 | Pending |
-| ARCH-04 | Phase 9 | Pending |
+| ARCH-03 | Phase 9 | Complete |
+| ARCH-04 | Phase 9 | Complete |
 | ARCH-05 | Phase 11 | Pending |
-| ARCH-06 | Phase 9 | Pending |
-| ARCH-07 | Phase 9 | Pending |
+| ARCH-06 | Phase 9 | Complete |
+| ARCH-07 | Phase 9 | Complete |
 | AUTH-01 | Phase 13 | Pending |
 | AUTH-02 | Phase 13 | Pending |
 | AUTH-03 | Phase 13 | Pending |
