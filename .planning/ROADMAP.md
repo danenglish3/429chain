@@ -59,7 +59,11 @@ Plans:
   3. A developer can swap SQLite for a different backend by implementing IAdminRepository and IStatsRepository alone
   4. The CI matrix job passes for APP_MODE=self-hosted with no Supabase env vars present
   5. All existing tests continue to pass through the new SQLite repository wrappers
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 09-01: Repository interfaces, SQLite wrappers, SaaS stubs, and factory
+- [ ] 09-02: Wire repository interfaces into routes and index.ts bootstrap
 
 ### Phase 10: Postgres Schema and RLS
 **Goal**: A Postgres schema exists in Supabase with all tenant tables protected by Row Level Security policies that enforce per-user data isolation
@@ -135,7 +139,7 @@ Phases execute in numeric order: 9 → 10 → 11 → 12 → 13 → 14
 | 6. Docker Deployment | v1.0 | 3/3 | Complete | 2026-02-06 |
 | 7. CLI Support | v1.0 | 3/3 | Complete | 2026-02-06 |
 | 8. Queue Mode | — | 3/3 | Complete | 2026-02-27 |
-| 9. Dual-Mode Repository Abstraction | v1.1 | 0/? | Not started | - |
+| 9. Dual-Mode Repository Abstraction | v1.1 | 0/2 | Planning complete | - |
 | 10. Postgres Schema and RLS | v1.1 | 0/? | Not started | - |
 | 11. Supabase Repository Implementations | v1.1 | 0/? | Not started | - |
 | 12. Hono Auth Middleware and SaaS Route Wiring | v1.1 | 0/? | Not started | - |
@@ -144,4 +148,4 @@ Phases execute in numeric order: 9 → 10 → 11 → 12 → 13 → 14
 
 ---
 *Roadmap created: 2026-02-05*
-*Last updated: 2026-03-01 after v1.1 roadmap created (phases 9-14)*
+*Last updated: 2026-03-01 after Phase 9 planning complete (2 plans)*
