@@ -5,15 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-02-06)
 
 **Core value:** Requests never fail due to rate limits when free tokens exist somewhere in the chain
-**Current focus:** v1.0 shipped. Planning next milestone.
+**Current focus:** v1.1 SaaS Ready — multi-tenant with Supabase Auth + Postgres
 
 ## Current Position
 
-Milestone: Phase 8 - Queue Mode (completed 2026-02-27)
-Status: Complete (verified 17/17 must-haves)
-Last activity: 2026-02-27 - Phase 8 complete: Queue mode for requests when all providers exhausted
-
-Progress: [█████████████████████] 100%
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-03-01 — Milestone v1.1 SaaS Ready started
 
 ## Performance Metrics
 
