@@ -29,6 +29,8 @@ import { createAdminRoutes } from './api/routes/admin.js';
 import { createTestRoutes } from './api/routes/test.js';
 import { RequestQueue } from './queue/request-queue.js';
 import { QueueShutdownError } from './shared/errors.js';
+import { createRepositories } from './persistence/repositories/factory.js';
+import type { AppMode } from './persistence/repositories/factory.js';
 
 // --- Bootstrap ---
 
@@ -43,6 +45,10 @@ const config = loadConfig(configPath);
 
 // Create mutable config reference for admin routes
 const configRef = { current: config };
+
+// Resolve application mode from APP_MODE env var (defaults to self-hosted)
+const rawMode = process.env['APP_MODE'] ?? 'self-hosted';
+const appMode: AppMode = rawMode === 'saas' ? 'saas' : 'self-hosted';
 
 // Update logger level from config
 logger.level = config.settings.logLevel;
@@ -123,6 +129,14 @@ migrateSchema(db);
 const requestLogger = new RequestLogger(db);
 const aggregator = new UsageAggregator(db);
 
+// --- Create repositories (mode-based factory) ---
+const repos = await createRepositories(appMode, {
+  configRef,
+  configPath,
+  aggregator,
+  requestLogger,
+});
+
 // --- Create Hono application ---
 
 const app = new Hono();
@@ -144,7 +158,7 @@ const chatRoutes = createChatRoutes(
   tracker,
   registry,
   config.settings.defaultChain,
-  requestLogger,
+  repos.stats,
   config.settings.requestTimeoutMs,
   config.settings.normalizeResponses,
   config.settings.streamIdleTimeoutMs,
@@ -152,14 +166,14 @@ const chatRoutes = createChatRoutes(
   config.settings.queueMaxWaitMs,
 );
 const modelsRoutes = createModelsRoutes(chains);
-const statsRoutes = createStatsRoutes(aggregator);
+const statsRoutes = createStatsRoutes(repos.stats);
 const rateLimitRoutes = createRateLimitRoutes(tracker, chains, queue);
 const adminRoutes = createAdminRoutes({
-  configRef,
-  configPath,
+  admin: repos.admin,
   registry,
   chains,
   tracker,
+  defaultChain: config.settings.defaultChain,
 });
 const testRoutes = createTestRoutes(chains, registry, config.settings.requestTimeoutMs);
 
