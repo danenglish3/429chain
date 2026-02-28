@@ -1,299 +1,250 @@
 # Project Research Summary
 
-**Project:** 429chain
-**Domain:** AI inference proxy/aggregator
-**Researched:** 2026-02-05
-**Confidence:** MEDIUM-HIGH
+**Project:** 429chain v1.1 SaaS Multi-Tenancy
+**Domain:** AI inference proxy — adding Supabase Auth + Postgres multi-tenancy to an existing single-user self-hosted proxy
+**Researched:** 2026-03-01
+**Confidence:** HIGH
 
 ## Executive Summary
 
-429chain is an OpenAI-compatible AI inference proxy designed to maximize free-tier token usage through intelligent waterfall routing. The product sits in a unique market position: while LiteLLM and Portkey focus on paid-tier optimization, and OpenRouter is a closed SaaS aggregator, 429chain is the first open-source proxy laser-focused on extracting maximum value from free AI provider tiers through proactive rate-limit awareness.
+429chain v1.1 adds a SaaS multi-tenant mode to an existing, fully-shipped single-user proxy. The architecture centers on one core constraint: self-hosted mode must remain completely unchanged and zero-dependency on Supabase. This is enforced through a repository pattern abstraction that separates storage backends behind a common interface, selected at startup via a `MODE=saas` env var. Every Supabase-specific module must be isolated behind dynamic imports and only loaded in SaaS mode — unconditional Supabase imports anywhere in shared code will break self-hosted deployments silently.
 
-The recommended approach is a layered architecture built on Node.js 20+, Hono (lightweight HTTP framework), and better-sqlite3 for persistence. The core differentiation lies in the waterfall engine: unlike competitors that reactively retry on failures, 429chain proactively tracks rate limits via response headers, implements provider cooldown timers, and intelligently skips exhausted providers before wasting requests. The architecture must handle SSE streaming as a first-class concern — this is both the most critical user experience feature and the most architecturally complex component.
+The SaaS data layer uses Supabase Auth for user management (email/password, JWT issuance) and Supabase Postgres with Row Level Security for tenant data isolation. The critical implementation discipline is dual-client usage: a per-request user-scoped Supabase client (initialized with the user's JWT) for all tenant-data queries so RLS enforces isolation automatically, and a service-role client restricted exclusively to explicit admin operations like user provisioning. Using the service-role client in route handlers silently bypasses all RLS and exposes every tenant's data — this is the highest-severity pitfall and must be enforced structurally.
 
-The primary risks center on streaming complexity and provider inconsistencies. SSE buffering destroys user experience, mid-stream failover is architecturally impossible (unlike non-streaming requests), and "OpenAI-compatible" providers differ in dozens of subtle ways. Success requires: (1) building the provider adapter layer from day one to isolate quirks, (2) treating rate limit state as in-memory-first with periodic persistence, not synchronous disk reads, and (3) accepting that streaming requests cannot waterfall after chunks begin flowing — pre-stream validation is mandatory.
+The key risks are (1) RLS misconfiguration enabling cross-tenant data leakage, particularly missing `WITH CHECK` clauses on INSERT/UPDATE policies and un-tenant-scoped unique constraints; (2) connection pooler session variable leakage when using `SET` instead of `SET LOCAL` for JWT claim context; (3) the SaaS chat path requiring per-request DB queries to load each tenant's providers and chains (no shared startup-loaded Maps), which is a significant architectural change to the hot path. The recommended mitigation is to build the repository abstraction first, validate both backends in CI with a matrix job, and write cross-tenant isolation tests before any feature work.
 
 ## Key Findings
 
 ### Recommended Stack
 
-**Core Runtime:** Node.js 20+ LTS (native fetch, stable ESM, AbortController built-in) with TypeScript 5.5+ in strict mode.
+The v1.1 additions are minimal: three new backend packages (`@supabase/supabase-js`, `postgres`, `jose`) and one frontend package (`@supabase/supabase-js`). The entire existing stack (Hono, better-sqlite3, React 19, Vite, tsdown, zod, pino, nanoid, vitest) is unchanged. No ORM is needed — the repository pattern uses raw SQL with typed interfaces on each backend.
 
-**HTTP Framework:** Hono 4.x — purpose-built for proxy workloads with native SSE streaming helpers, middleware composition, and minimal footprint (~14KB). Runs on Node via `@hono/node-server`. Superior to Express (outdated, poor streaming) and lighter than Fastify for this use case.
+The critical version constraint is `jose` v6, which is ESM-only and required for JWKS-based JWT verification. Supabase projects created after May 2025 use asymmetric RSA keys by default; Hono's built-in JWT middleware only handles static secrets and cannot verify asymmetric keys. `jose` with `createRemoteJWKSet()` is the correct choice. The Postgres driver is `postgres` (postgres.js v3), not `pg` — it is ESM-native, Supabase-recommended, and uses a tagged-template API. The session pooler URL (not transaction mode) is required for the long-running Docker container deployment.
 
-**Persistence:** SQLite via better-sqlite3 11.x — synchronous API, zero-config, single-file database perfect for lightweight logs/stats/config. Drizzle ORM optional but recommended for typed queries. Avoid Prisma (heavyweight binary engine, slow cold starts).
+**Core technologies:**
+- `@supabase/supabase-js` ^2.98.0: Auth client (browser) + PostgREST client (server); `@supabase/ssr` explicitly NOT needed for a Vite SPA
+- `postgres` ^3.4.8: Direct Postgres driver — ESM-native, Supabase-recommended for long-running containers; session pooler URL required
+- `jose` ^6.1.3: JWT verification with JWKS endpoint support — handles Supabase's asymmetric keys; replaces Hono's built-in JWT middleware
 
-**UI Stack:** React 18.x/19.x + Vite 5.x/6.x (SPA served as static files by Hono), TanStack Query for server state management, Tailwind CSS + shadcn/ui for components, Recharts for usage visualizations.
-
-**Critical Libraries:** Zod for validation (requests, config, env vars), Pino for structured logging, native fetch for upstream requests (no axios/node-fetch needed), nanoid for ID generation, ms for time parsing.
-
-**Avoid:** Express (poor TypeScript, no streaming), Axios (unnecessary, no streaming), Prisma (overkill), Redis (adds daemon dependency for minimal benefit at this scale), Next.js (massive complexity for a management SPA), MongoDB (violates lightweight constraint).
-
-**Confidence:** HIGH on architectural choices (Hono, SQLite, React+Vite). MEDIUM on exact versions (based on May 2025 training data — verify latest before npm install).
+**What NOT to add:**
+- `@supabase/ssr` — designed for SSR frameworks (Next.js, Remix); this is a Vite SPA
+- `drizzle-orm` / `prisma` — ORM abstraction conflicts with dual-mode repository pattern; use raw SQL
+- `jsonwebtoken` — CommonJS-only, no JWKS support; replaced by `jose`
+- `pg` (node-postgres) — older, CJS-first; replaced by `postgres`
 
 ### Expected Features
 
-**Table Stakes (v1.0 requirements):**
-- OpenAI-compatible `/v1/chat/completions` endpoint (streaming + non-streaming)
-- Multi-provider support (minimum: OpenRouter, Groq, Cerebras)
-- Waterfall routing on 429/failure with ordered provider chains
-- Reactive rate limit learning (429 detection + cooldown timers)
-- Basic proactive rate limit tracking (parse common x-ratelimit-* headers)
-- API key gating for proxy access
-- Request logging (provider used, tokens, latency, status)
-- Health check endpoint (`/health`)
-- Docker deployment with minimal config
+The v1.1 MVP must preserve self-hosted mode as a first-class deployment option while adding a parallel SaaS path. All table-stakes features revolve around the auth/tenant stack. Billing, team accounts, OAuth, and admin dashboards are explicitly deferred.
 
-**Differentiators (what makes 429chain unique):**
-- **Intelligent rate-limit-aware waterfall** — proactive header parsing + reactive 429 learning + cooldown timers. No other open-source tool optimizes specifically for free-tier quota maximization.
-- **Chain-level abstraction** — user defines named chains (ordered provider+model lists), proxy handles routing. Cleaner UX than LiteLLM's model groups.
-- **Real-time usage dashboard** — visual display of per-provider quota status ("Groq: 28/30 RPM, resets in 42s").
-- **Request cost tracking ($0 saved)** — "You saved $4.72 today" vanity metric validates product value.
+**Must have (table stakes):**
+- `APP_MODE` env var dual-path initialization — gates Supabase; preserves self-hosted path unchanged
+- Repository pattern abstraction (SQLite and Postgres implementations behind one interface) — required before any other v1.1 feature; highest-risk dependency
+- Supabase Auth: email/password signup with email verification
+- Persistent JWT sessions with refresh (Supabase session management, localStorage for SPA)
+- Protected React routes via `ProtectedRoute` component and `AuthContext`
+- Postgres schema with RLS on all tenant tables (`providers`, `chains`, `chain_entries`, `request_logs`)
+- Per-tenant proxy API key (generated on account creation, resolves tenant context on proxy requests)
+- BYOK provider keys per tenant (stored in Postgres with `user_id`, isolated by RLS)
+- Login and signup pages, logout
+- Cloud deployment env var documentation
 
-**Anti-Features (explicitly out of scope):**
-- Cost-optimized routing (irrelevant for free tiers, adds massive complexity)
-- Semantic caching (low hit rates, stale response risk, adds complexity)
-- Multi-user RBAC (massive scope creep for v1)
-- Prompt transformation/middleware (prompt injection risks, debugging nightmare)
-- Guardrails/content filtering (rely on provider-side filtering)
-- Embedding/image/audio endpoints (v2+ at earliest)
+**Should have (competitive differentiators):**
+- Zero-friction onboarding: signup to first proxied request under 5 minutes
+- Per-tenant usage isolation in dashboard (tenant-scoped existing v1.0 dashboard — no rewrites)
+- Single Docker image, env-var-driven mode selection — no code forks, no separate images
+- Instant migration path for self-hosted users (same proxy API; change only `baseURL`)
 
-**MVP Feature Set:** OpenAI-compatible chat endpoint, 3 provider adapters, chain config files, waterfall on 429, basic rate limit tracking, API key auth, request logging, health check, Docker deployment.
+**Defer (v2+):**
+- Team/org accounts with RBAC (doubles scope; doubles auth surface)
+- OAuth / social login (Supabase supports it; add when email/password proves friction)
+- Billing integration (own milestone; premature billing creates technical debt)
+- Customer-managed encryption keys (enterprise-grade; v3+ only)
+- SSO / SAML, Admin user management dashboard
 
-**Post-MVP (v1.x):** Web UI for provider/chain management, usage dashboard, test endpoint, SQLite persistence for historical stats, manual rate limit overrides, provider health monitoring.
-
-**Confidence:** HIGH on table stakes and differentiators (well-established patterns). MEDIUM on anti-feature validation (based on LiteLLM/OpenRouter/Portkey training knowledge).
+**Feature dependency note:** Auth must come before tenant data isolation. The database abstraction layer is the highest-risk dependency — everything else depends on it. v1.0 UI components are extended, not rewritten.
 
 ### Architecture Approach
 
-**Pattern:** Layered gateway architecture with strict separation of concerns.
+The architecture is an extension, not a rewrite. The existing Hono server, React SPA, and self-hosted SQLite path are preserved intact. New SaaS-specific code is added in two areas: (1) a `src/persistence/repositories/` directory containing interface definitions, factory, and two concrete implementations; (2) a frontend auth layer (`AuthContext`, `Login`, `Signup`, `ProtectedRoute`) that wraps existing pages without modifying them. The route factories (`createAdminRoutes`, `createStatsRoutes`) are updated to accept repository interfaces instead of raw dependencies.
 
-**Layer 1 (HTTP Surface):** Hono server with OpenAI-compatible endpoints, auth middleware, request validation, SSE response management, Web UI static serving.
+**Major components:**
+1. `repositoryFactory` — reads `MODE` env var at startup, returns `{admin, stats}` repository pair; single decision point for all backend selection
+2. `createSupabaseAuthMiddleware` — validates user JWT via `supabase.auth.getUser()`, sets `c.var.userId`; replaces API key check in SaaS mode only; existing `createAuthMiddleware` unchanged for self-hosted
+3. `SupabaseAdminRepository` / `SupabaseStatsRepository` — Postgres implementations using service-role client for writes (explicit `user_id`), user-scoped client for reads (RLS enforces isolation automatically)
+4. `SQLiteAdminRepository` / `SQLiteStatsRepository` — thin wrappers around existing config/YAML/registry logic; `userId` parameter accepted but ignored; self-hosted behavior 100% preserved
+5. `AuthContext` (React) — session state via `onAuthStateChange`; provides `userId` and `signOut`; reads from localStorage (no network) for route gating
 
-**Layer 2 (Request Orchestration):** Chain resolution (which chain for this request?), waterfall execution loop (iterate through chain entries), retry/timeout logic, response normalization.
-
-**Layer 3 (Provider Intelligence):** Rate limit tracking (proactive header parsing + reactive 429 detection), cooldown timers per provider+model, provider availability scoring.
-
-**Layer 4 (Provider Adapters):** HTTP client per provider, request/response translation (OpenAI ↔ provider format), SSE stream passthrough/transformation, rate limit header extraction. Each provider gets an adapter class implementing `BaseProviderAdapter` interface.
-
-**Layer 5 (Persistence):** Config file read/write (YAML/JSON), usage/stats logging, request history, in-memory state with periodic flush.
-
-**Key Component Responsibilities:**
-- **Chain Router:** Executes waterfall logic (iterate chain, check rate limits, call adapters, handle failures).
-- **Rate Limit Tracker:** In-memory map of per-provider+model state (AVAILABLE → TRACKING → EXHAUSTED), updated from response headers and 429s.
-- **Provider Adapter:** Normalizes provider-specific quirks (different header formats, error shapes, SSE chunk boundaries, model naming).
-- **SSE Bridge:** Pipes upstream SSE responses to client with interception for token counting, handles mid-stream errors.
-
-**Critical Design Decisions:**
-- **Proactive provider skipping:** Check rate limit state BEFORE making requests. Without this, every request sequentially hits exhausted providers, adding latency.
-- **Streaming constraint:** Once SSE streaming starts (first chunk sent), waterfall is impossible — HTTP response is committed. Pre-stream validation mandatory. Mid-stream failures send error events, don't retry.
-- **In-memory rate limit state:** Persisting to disk on every request is a performance killer. Keep state in-memory, flush periodically (30s or on shutdown).
-- **Event-driven side effects:** Usage tracking, logging, metrics use an event bus. Never block the critical request path.
-
-**Anti-Patterns to Avoid:**
-- Monolithic request handler (500-line route functions)
-- Synchronous disk reads for rate limit checks
-- Buffering full streaming responses
-- Hard-coding provider logic (use adapter pattern)
-- Tight coupling between proxy and dashboard
-- Retry loops without circuit breaking
-
-**Confidence:** HIGH (architecture patterns drawn from LiteLLM, Portkey, and standard API gateway designs).
+**Suggested build order (from ARCHITECTURE.md):**
+1. Repository interfaces + SQLite wrappers (no auth needed, testable with hardcoded userId)
+2. Postgres schema + RLS policies (schema must exist before Supabase repos can be written)
+3. Supabase repository implementations
+4. Hono Supabase auth middleware + route wiring
+5. Route factory updates to accept repository interfaces; SaaS chat path redesign
+6. Frontend auth layer
+7. End-to-end integration + cross-tenant isolation tests
 
 ### Critical Pitfalls
 
-**Pitfall 1: SSE Streaming Buffering**
-- **Risk:** Proxy buffers SSE chunks before forwarding, user sees "bursty" output instead of real-time tokens.
-- **Cause:** Node.js HTTP response buffering, compression middleware, nginx `proxy_buffering on`, missing `flushHeaders()`.
-- **Prevention:** Set SSE headers (`text/event-stream`, `no-cache`, `X-Accel-Buffering: no`), call `res.flushHeaders()` before first chunk, exclude SSE routes from compression, test with real OpenAI SDK not just curl.
-- **Phase:** 1 (core proxy) — must be correct from day one.
+The PITFALLS.md covers both v1.0 pitfalls (relevant to the existing proxy) and v1.1 SaaS-specific pitfalls. Top pitfalls for v1.1:
 
-**Pitfall 2: Waterfall During Active Streaming Is Impossible**
-- **Risk:** Provider fails mid-stream, proxy wants to retry, but client already received partial response. Results in truncated/garbled output.
-- **Cause:** SSE is append-only. Once bytes are sent, they cannot be unsent.
-- **Prevention:** Accept this constraint. Waterfall BEFORE streaming begins. Send SSE error event for mid-stream failures. Pre-flight validation to avoid starting doomed streams.
-- **Phase:** 1 (architecture) — waterfall design must account for this upfront.
+1. **Unconditional Supabase imports in shared modules** — Any top-level ESM `import` from `@supabase/supabase-js` in a module loaded by self-hosted mode causes startup failure. All Supabase code must live exclusively in `src/persistence/repositories/supabase/`; use dynamic `import()` at the factory level; CI matrix job for `MODE=self-hosted` with no Supabase env vars is mandatory.
 
-**Pitfall 3: Provider "Compatibility" Is Full of Edge Cases**
-- **Risk:** "OpenAI-compatible" providers differ in response formats, error shapes, header formats, SSE chunk boundaries. Each integration becomes whack-a-mole.
-- **Cause:** Every provider has quirks (null vs empty string vs omitted fields, different rate limit headers, model name mapping).
-- **Prevention:** Provider adapter layer from day one. Each adapter normalizes requests AND responses. Integration tests per provider. Parse SSE defensively.
-- **Phase:** 1 (provider adapters) and ongoing iteration.
+2. **Global service_role client in route handlers** — Bypasses all RLS silently; exposes all tenants' data. Structural rule: service_role client only in explicitly named admin functions; all route-handler DB access uses per-request user-scoped client via `c.var`; cross-tenant isolation test is mandatory.
 
-**Pitfall 4: Rate Limit State Is Complex**
-- **Risk:** Tracking is inaccurate, leading to either wasted 429 attempts or skipping available providers.
-- **Cause:** Multiple limit dimensions (RPM, RPD, TPM, TPD, concurrent), rolling vs fixed windows, race conditions, unknown limits on free tiers, missing headers.
-- **Prevention:** Layered tracking (headers → 429 reactive → manual config). Cooldown timers on 429. Accept imprecision ("mostly right" is OK). Don't predict token usage pre-request.
-- **Phase:** 1 (reactive 429 + cooldown), 2 (proactive header tracking).
+3. **RLS policies missing `WITH CHECK` on INSERT/UPDATE** — `USING` alone filters reads; without `WITH CHECK`, tenants can inject data into other tenants' namespaces. Every INSERT/UPDATE policy must include `WITH CHECK (auth.uid() = user_id)`; run Supabase Security Advisor after every schema change.
 
-**Pitfall 5: OpenAI SDK Expects More Than /v1/chat/completions**
-- **Risk:** SDK clients break because they expect `/v1/models`, specific headers, exact error schema.
-- **Cause:** SDK makes initialization calls to `/v1/models`, expects Organization headers not to error, requires exact `finish_reason` values, needs usage in final streaming chunk with `stream_options`.
-- **Prevention:** Implement `/v1/models`, match OpenAI response schema exactly, test with official OpenAI Node.js/Python SDKs, normalize all error responses.
-- **Phase:** 1 (core proxy).
+4. **Session variable leakage with Supavisor connection pooler** — `SET` (session-level) for JWT claims persists across pooled connections; under concurrent load, tenant A's context leaks to tenant B's request. Always use `SET LOCAL` inside an explicit transaction; concurrent cross-tenant test required.
 
-**Pitfall 6: Secrets Leaked Through Logs/Errors/Config**
-- **Risk:** Provider API keys end up in logs, error messages, or committed to git.
-- **Cause:** Logging full request headers, returning provider errors to client, committing config files.
-- **Prevention:** Redact `Authorization` headers in logs, never forward provider errors without sanitization, use `.env` for keys, mask keys in UI.
-- **Phase:** 1 (from first line of code).
+5. **In-memory Maps cannot serve SaaS mode** — The startup-loaded `registry` and `chains` Maps are single-user. SaaS mode requires per-request DB queries to load each tenant's providers and chains. The chat route must be redesigned for SaaS (load from Postgres per-request; per-userId LRU cache). This is the primary architectural complexity of the SaaS hot path.
 
-**Pitfall 7: Connection/Memory Leaks from Abandoned SSE Streams**
-- **Risk:** Client disconnects mid-stream, proxy keeps upstream connection open, leaking memory and connections.
-- **Cause:** Missing AbortController wiring, unhandled `req.on('close')`, upstream request not aborted on client disconnect.
-- **Prevention:** Wire AbortController to every upstream request, handle `req.on('close')` and `req.on('error')`, set timeouts, test with client disconnect scenarios.
-- **Phase:** 1 (SSE implementation) — #1 production stability issue for streaming proxies.
+6. **`getUser()` in SSE streaming loop** — The Supabase `getUser()` call makes a network round-trip; placing it inside the streaming loop adds 50-200ms latency per chunk. Validate JWT once at stream establishment; store `userId` in request context closure; all mid-stream DB writes use stored `userId`.
 
-**Pitfall 8: JSON Config Files Become Unmanageable**
-- **Risk:** Deeply nested config, no comments, cryptic startup errors from typos.
-- **Cause:** No schema validation, JSON doesn't support comments, evolving config structure.
-- **Prevention:** Use YAML for config (supports comments), Zod schema validation with clear error messages, keep structure flat, provide `config.example.yaml`, Web UI as primary config interface.
-- **Phase:** 1 (config design).
+7. **BYOK provider API keys stored as plaintext** — A single RLS misconfiguration exposes all tenants' provider credentials. Encrypt at the application layer before writing to Postgres (Supabase Vault or AES-256-GCM with server-side `ENCRYPTION_KEY` env var).
 
-**Pitfall 9: Testing Free Tiers Is Flaky**
-- **Risk:** Integration tests hit real provider APIs, go red due to rate limits/downtime/behavior changes.
-- **Cause:** Free tiers are low priority for providers, aggressive rate limits, unpredictable availability.
-- **Prevention:** Separate unit tests (mock providers) from integration tests (real APIs, opt-in, not required for CI). Build comprehensive mocks simulating quirks. HTTP cassette approach for recorded responses.
-- **Phase:** 1 (test architecture).
-
-**Pitfall 10: Web UI and Proxy Server Process Conflicts**
-- **Risk:** UI and proxy in same process, CPU work in UI blocks proxy event loop, memory leaks affect both.
-- **Cause:** Node.js single-threaded, shared memory space, port conflicts.
-- **Prevention:** Separate ports even if same process (proxy 4290, UI 4291). Separate Hono app instances. Design clean API boundary for eventual process separation.
-- **Phase:** 1 (architecture).
-
-**Confidence:** HIGH (pitfalls drawn from LiteLLM issues, Portkey architecture, and Node.js streaming best practices).
+8. **Unique constraints without tenant scope** — A global `UNIQUE(name)` leaks data existence across tenants (duplicate key error reveals another tenant has a resource with that name). Every uniqueness constraint must include `user_id`: `UNIQUE(user_id, name)`.
 
 ## Implications for Roadmap
 
+Based on the dependency chain from FEATURES.md and the build order from ARCHITECTURE.md, the natural phase structure is:
+
+### Phase 1: Dual-Mode Repository Abstraction
+
+**Rationale:** Everything else depends on this. The interface must be defined before either implementation is written. This phase has no auth dependency and is fully testable with hardcoded user IDs. It also locks in the structural rule that prevents Supabase imports from leaking into shared code. Self-hosted mode is validated here before any Supabase code exists.
+
+**Delivers:** `IAdminRepository`, `IStatsRepository` interfaces; `SQLiteAdminRepository` and `SQLiteStatsRepository` wrappers (extracting existing route handler logic); `repositoryFactory` with `MODE` env var selection; updated `createAdminRoutes` and `createStatsRoutes` accepting repository interfaces; self-hosted mode working identically to today via new code path.
+
+**Addresses:** APP_MODE env var gating (P1); database abstraction layer (P1)
+
+**Avoids:** Supabase import leakage (SaaS Pitfall 1); DB abstraction interface leak (SaaS Pitfall 7)
+
+**Research flag:** Standard patterns — no research-phase needed. Repository pattern and factory approach are explicit in ARCHITECTURE.md.
+
+### Phase 2: Postgres Schema and RLS
+
+**Rationale:** The Supabase repository implementations cannot be written without a schema. Schema design is where the hardest security decisions live (RLS policy completeness, unique constraint scoping, encryption strategy). These are expensive to fix post-data.
+
+**Delivers:** `migrations.sql` with `providers`, `chains`, `chain_entries`, `request_logs` tables; RLS policies with `USING + WITH CHECK + TO authenticated` on all tables; tenant-scoped composite primary keys and uniqueness constraints (`UNIQUE(user_id, name)`); indexes on `(user_id, ...)` for RLS query performance; decision on provider API key encryption (Supabase Vault vs AES-256-GCM).
+
+**Addresses:** Postgres schema + RLS (P1); BYOK provider keys per tenant (P1)
+
+**Avoids:** Missing `WITH CHECK` (SaaS Pitfall 3); tenant-scoped unique constraints (SaaS Pitfall 8); plaintext API key storage (SaaS Pitfall 7); `auth.uid()` null silent failure (SaaS Pitfall 3)
+
+**Research flag:** Needs targeted review — run Supabase Security Advisor against schema once migrations are written; confirm encryption approach before any keys are stored.
+
+### Phase 3: Supabase Repository Implementations
+
+**Rationale:** Pure server logic, no Hono or React involved. Testable in isolation with direct Supabase client calls. Depends on Phase 2 (schema) and Phase 1 (interface definitions).
+
+**Delivers:** `supabase/client.ts` (service-role singleton + per-request user client factory); `SupabaseAdminRepository`; `SupabaseStatsRepository`; SaaS path wired into `repositoryFactory`; cross-tenant isolation test (user A cannot see user B's data).
+
+**Uses:** `@supabase/supabase-js` ^2.98.0, `postgres` ^3.4.8 — both new stack additions
+
+**Avoids:** Global service_role client in route handlers (SaaS Pitfall 2); `SET` vs `SET LOCAL` leakage (SaaS Pitfall 4)
+
+**Research flag:** Standard patterns — Supabase JS SDK client patterns are fully covered by official docs.
+
+### Phase 4: Hono Auth Middleware + Route Wiring + SaaS Chat Path
+
+**Rationale:** Depends on Phase 3 (repos must exist to receive `userId`). Also addresses the SaaS chat path redesign — the most complex single task in v1.1, because the existing startup-loaded Maps cannot serve multiple tenants.
+
+**Delivers:** `createSupabaseAuthMiddleware` with `jose` JWKS JWT verification; `c.var.userId` typed context variable threading through all admin and stats routes; SaaS chat path redesigned to load per-tenant providers/chains from Postgres per-request (with per-userId LRU cache, 60-second TTL); self-hosted mode confirmed unchanged.
+
+**Uses:** `jose` ^6.1.3 — JWKS-based JWT verification; replaces Hono's built-in JWT middleware
+
+**Avoids:** `getUser()` in SSE streaming loop (SaaS Pitfall 6); in-memory Maps as SaaS source of truth (ARCHITECTURE.md Anti-Pattern 3)
+
+**Research flag:** The SaaS chat path per-request loading and LRU cache design is a non-trivial architectural change. This phase warrants a focused implementation plan specifying cache key design, TTL, and invalidation triggers (on provider upsert/delete).
+
+### Phase 5: Frontend Auth Layer
+
+**Rationale:** Blocked on Phase 4 — needs a working authenticated API. New files only (except `api.ts`, `Layout.tsx`, `main.tsx` modifications); existing pages are unwrapped.
+
+**Delivers:** `ui/src/lib/supabase.ts` (browser Supabase client singleton); `AuthContext.tsx` with `onAuthStateChange`; `Login.tsx` and `Signup.tsx` pages with error states and post-signup "check your email" UI; `ProtectedRoute.tsx`; updated `api.ts` sending `session.access_token` as Bearer; updated `Layout.tsx` replacing API key input with auth status + logout; updated `main.tsx` adding `AuthProvider`, `/login`/`/signup` routes, `ProtectedRoute` on all app routes.
+
+**Addresses:** Login/signup UI (P1); protected routes (P1); logout (P1); persistent sessions (P1); email verification UX (P1)
+
+**Avoids:** `getSession()` on server-side (ARCHITECTURE.md Anti-Pattern 2); service_role key in frontend bundle (ARCHITECTURE.md Anti-Pattern 1)
+
+**Research flag:** Standard patterns — React Supabase auth with `onAuthStateChange` is the canonical documented pattern; no research needed.
+
+### Phase 6: End-to-End Integration and Deployment Config
+
+**Rationale:** Final integration gate before shipping. Validates both modes work correctly in isolation and together. Produces deployment documentation operators need.
+
+**Delivers:** Self-hosted smoke test (all existing routes, API key auth); SaaS smoke test (two-user cross-tenant isolation test with concurrent requests); chat completions logging to correct tenant's `request_logs`; Docker Compose updated for SaaS mode with env var documentation; cloud deployment runbook.
+
+**Addresses:** Self-hosted mode unchanged (P1); cloud deployment config (P1)
+
+**Avoids:** "Looks Done But Isn't" checklist items from PITFALLS.md SaaS section
+
+**Research flag:** Standard patterns — integration testing and documentation; no research needed.
+
 ### Phase Ordering Rationale
 
-The architecture dependency graph dictates a strict build order. Foundation → Provider Layer → Core Engine → Proxy Endpoint → Streaming → Tracking → Admin API → Web UI → Polish.
-
-**Why this order:**
-1. **Foundation first:** Types, config schema, error classes, logger, event bus have zero dependencies. Everything else depends on these.
-2. **Provider adapters before waterfall:** The chain router needs a clean provider interface. Adapters must be designed upfront to handle request translation, response normalization, and header extraction.
-3. **Non-streaming before streaming:** Streaming adds architectural constraints (can't waterfall mid-stream, SSE buffering risks). Validate waterfall logic with non-streaming requests first.
-4. **Tracking is parallel:** Usage collection hooks into request lifecycle via events, doesn't block core functionality. Can be added incrementally.
-5. **Web UI last:** UI consumes stable APIs. Build admin API endpoints first, then UI on top.
-
-### Suggested Phase Structure
-
-**Phase 1: Core Waterfall Proxy (Non-Streaming)**
-- **Rationale:** Prove the core value proposition (waterfall on 429) without streaming complexity.
-- **Delivers:** Working OpenAI-compatible endpoint for non-streaming chat completions, waterfall routing, reactive 429 handling with cooldown.
-- **Features:** Foundation (types, errors, logger, events), config schema (YAML + Zod validation), provider adapter layer (base class + generic OpenAI adapter), rate limit tracker (in-memory, simple cooldown on 429), chain router (waterfall logic), Hono server with auth middleware, `/v1/chat/completions` (non-streaming only), `/health` endpoint.
-- **Pitfalls Addressed:** #3 (provider adapters), #5 (OpenAI schema compliance), #6 (secret redaction), #8 (config design), #9 (test architecture).
-- **Phase Exit Criteria:** Send a request with 3 providers configured, first provider returns 429, proxy automatically tries second provider and returns success. All done without streaming.
-
-**Phase 2: SSE Streaming Support**
-- **Rationale:** Streaming is the expected UX for chat UIs. This is architecturally complex and must be isolated from Phase 1.
-- **Delivers:** SSE streaming for chat completions, waterfall works pre-stream, graceful error handling mid-stream.
-- **Features:** SSE parser/writer/bridge, streaming support in chain router (proactive provider validation before starting stream), AbortController wiring for client disconnect, streaming mode in provider adapters, test endpoint in Web UI for streaming validation.
-- **Pitfalls Addressed:** #1 (SSE buffering), #2 (mid-stream failover constraint), #7 (connection leaks).
-- **Phase Exit Criteria:** Stream a request through the proxy using the OpenAI Node SDK with `stream: true`. Verify TTFT < 100ms overhead. Kill the client mid-stream, verify upstream connection is cleaned up.
-
-**Phase 3: Proactive Rate Limit Tracking**
-- **Rationale:** Reactive 429 handling (Phase 1) works but wastes requests. Proactive tracking optimizes free-tier usage.
-- **Delivers:** Header-based rate limit tracking, intelligent provider skipping before attempting requests.
-- **Features:** Rate limit header parser per provider, AVAILABLE → TRACKING → EXHAUSTED state machine, cooldown timers based on reset timestamps (not just arbitrary delays), periodic state persistence to SQLite for restart recovery, provider health monitoring (error rates, latency trends).
-- **Pitfalls Addressed:** #4 (rate limit state complexity).
-- **Phase Exit Criteria:** Send 25 requests to a provider with 20 RPM limit. Verify the 21st request skips that provider proactively (no 429 attempt) and uses the next in chain.
-
-**Phase 4: Persistence & Usage Tracking**
-- **Rationale:** Users need visibility into what the proxy is doing. This phase adds observability.
-- **Delivers:** Request logging to SQLite, usage stats aggregation, historical data for dashboard.
-- **Features:** SQLite schema (Drizzle or raw SQL), request log table, usage collector (event-driven), stats aggregation (per-provider, per-chain, daily totals), log rotation, "money saved" metric.
-- **Pitfalls Addressed:** None directly, but enables debugging future issues.
-- **Phase Exit Criteria:** Run the proxy for 24 hours with realistic traffic. Query SQLite to get per-provider request counts, token usage, average latency.
-
-**Phase 5: Web UI & Admin API**
-- **Rationale:** Config file editing is clunky. Web UI makes the proxy accessible to non-technical users.
-- **Delivers:** Browser-based dashboard for provider/chain management, live usage monitoring, request testing.
-- **Features:** Admin API (CRUD for providers/chains, stats endpoints, test endpoint), React SPA (provider management page, chain editor with drag-to-reorder, usage dashboard with charts, test endpoint page), TanStack Query for server state, Recharts for visualizations, API key masking in UI.
-- **Pitfalls Addressed:** #8 (config complexity — UI becomes primary interface), #10 (process separation — separate ports/apps).
-- **Phase Exit Criteria:** Use only the Web UI to: add a new provider, create a chain with 3 entries, reorder the chain, send a test request, view the result and which provider handled it.
-
-**Phase 6: Deployment & Polish**
-- **Rationale:** The proxy works but needs production-ready deployment.
-- **Delivers:** Docker image, docker-compose setup, npm CLI package, documentation.
-- **Features:** Multi-stage Dockerfile, docker-compose with volume mounts for config/data, npm package with `npx 429chain` CLI, comprehensive README, config examples, provider setup guides, deployment guides (Docker, VPS, local), health check integration with Docker.
-- **Pitfalls Addressed:** None new, but validates all previous phases in production-like environment.
-- **Phase Exit Criteria:** `docker compose up` with a config file, send requests through the proxy, restart the container, verify state persists (rate limits, logs).
+- Phases 1-3 are pure backend with no auth dependency — all testable with hardcoded data; this validates the most complex and risky work before user-facing pieces are built
+- Phase 4 (auth middleware) is blocked on Phase 3 — repos must exist to receive `userId` from middleware
+- Phase 5 (frontend) is blocked on Phase 4 — needs working authenticated API endpoints to call
+- Phase 6 (integration) is blocked on all prior phases but adds no new features — it is the validation gate
+- Self-hosted mode is validated after Phase 1 (before any Supabase code exists), after Phase 4 (auth wiring), and in Phase 6 — three explicit checkpoints prevent regression
 
 ### Research Flags
 
-**Phases that need `/gsd:research-phase` during planning:**
-- **Phase 2 (SSE Streaming):** SSE handling nuances are complex. Research SSE parser libraries (eventsource-parser), Node.js streaming best practices, backpressure handling.
-- **Phase 3 (Rate Limit Tracking):** Provider-specific rate limit header formats. Research current header formats for OpenRouter, Groq, Cerebras (training data is May 2025, these may have changed).
+Phases needing deeper per-plan research during planning:
+- **Phase 2:** RLS policy correctness for this specific schema — run Security Advisor; confirm encryption strategy before writing migration
+- **Phase 4:** SaaS chat path redesign — per-request tenant resolution and LRU cache implementation are non-trivial changes to the proxy hot path; needs a dedicated implementation plan
 
-**Phases with well-documented patterns (skip research):**
-- **Phase 1 (Core Proxy):** Standard HTTP middleware patterns, adapter pattern, chain of responsibility.
-- **Phase 4 (Persistence):** SQLite + Drizzle is well-documented.
-- **Phase 5 (Web UI):** React + TanStack Query + Vite is standard SPA stack.
-- **Phase 6 (Deployment):** Docker multi-stage builds are standard.
+Phases with standard patterns (skip research-phase):
+- **Phase 1:** Repository pattern + factory — build order explicit in ARCHITECTURE.md
+- **Phase 3:** Supabase client patterns — fully covered by official Supabase docs
+- **Phase 5:** React AuthContext + Supabase — canonical documented pattern
+- **Phase 6:** Integration testing and deployment docs — no novel patterns
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | Hono, SQLite, React+Vite are mature, well-understood choices. Version numbers MEDIUM (based on May 2025 training, verify before install). |
-| Features | HIGH | Table stakes and differentiators drawn from analysis of LiteLLM, OpenRouter, Portkey. Anti-features validated against real product complexity. |
-| Architecture | HIGH | Layered gateway pattern is standard. Provider adapter layer, rate limit state machine, SSE passthrough are proven patterns. |
-| Pitfalls | HIGH | Drawn from LiteLLM GitHub issues, Portkey architecture docs, Node.js streaming gotchas, real-world proxy deployment experience. |
+| Stack | HIGH | Versions verified against npm registry March 2026; official Supabase docs confirm every recommendation; `@supabase/ssr` exclusion explicitly confirmed |
+| Features | HIGH | Official Supabase Auth and RLS docs; competitor analysis verified via live WebFetch; feature dependency graph matches official patterns |
+| Architecture | HIGH | Core patterns verified against official Supabase + Hono docs; build order validated against dependency graph; anti-patterns from official Supabase security guidance |
+| Pitfalls (v1.1 SaaS) | HIGH | Critical and security pitfalls verified against official Supabase RLS docs, Bytebase RLS footguns article, Supavisor/pgbouncer docs, AWS multi-tenant RLS guide |
+| Pitfalls (v1.0 original) | MEDIUM | Based on training data (cutoff May 2025); web verification was unavailable at time of original research (2026-02-05); patterns are established but provider-specific details should be revalidated |
 
-**Overall Confidence:** MEDIUM-HIGH. The architectural approach and feature set are high-confidence because the patterns are well-established. Exact version numbers and current provider API details are medium-confidence because they're based on May 2025 training data. WebSearch/WebFetch were unavailable during research — verify these before implementation:
-- Current npm package versions (Hono, better-sqlite3, Drizzle, React, Vite, Tailwind)
-- Current provider rate limit header formats (OpenRouter, Groq, Cerebras)
-- Current provider API quirks (supported parameters, error shapes, SSE formats)
-- Current `eventsource-parser` library API
+**Overall confidence:** HIGH
 
 ### Gaps to Address
 
-1. **Provider API verification:** Training data on Groq, Cerebras, OpenRouter APIs is May 2025. Rate limit headers, supported parameters, and model availability may have changed. Validate during Phase 1 implementation.
-
-2. **SSE library selection:** `eventsource-parser` was recommended based on training knowledge. Verify it still exists and is maintained. Check for alternatives (native Node.js SSE handling, Hono SSE helpers).
-
-3. **Docker base image security:** Node 20-slim recommended. Verify current security status, check for newer LTS versions (Node 22 is current LTS as of training cutoff).
-
-4. **Tailwind v4 compatibility:** Training data indicates Tailwind v4 changed config format. Verify shadcn/ui compatibility with Tailwind v4. If issues, use Tailwind v3.
-
-5. **React 19 breaking changes:** React 19 may have incompatibilities with some libraries. Verify TanStack Query, Recharts compatibility. If issues, use React 18.
+- **SaaS chat path LRU cache design:** The architecture identifies per-request provider/chain loading as a requirement but stops short of a full implementation plan. Phase 4 plan must specify: cache key design, TTL, max size, invalidation on provider upsert/delete, and cold-start behavior.
+- **Provider API key encryption approach:** Research identifies Supabase Vault and AES-256-GCM as two valid options. Phase 2 plan must commit to one. Supabase Vault is simpler operationally but couples to Supabase; AES-256-GCM is portable and works independently of Supabase availability.
+- **`getClaims()` vs `getUser()` per-request:** ARCHITECTURE.md recommends `getUser()` initially (more secure, network call) with a note to switch to `getClaims()` (local, no network) if latency is a concern. Phase 4 plan should decide which to ship given the proxy's latency sensitivity.
+- **Email confirmation UX:** FEATURES.md notes email verification is Supabase default; PITFALLS.md SaaS UX section warns that a missing "check your email" state causes users to think the product is broken. Phase 5 must explicitly handle post-signup state.
+- **Concurrent cross-tenant test:** Both ARCHITECTURE.md and PITFALLS.md require this test but neither specifies the implementation. Phase 6 plan should specify this as a concrete deliverable with the exact test structure (two users, concurrent inserts, verify no cross-tenant reads).
+- **Current provider rate limit header formats:** v1.0 PITFALLS.md flags OpenRouter, Groq, Cerebras headers as MEDIUM confidence with training data cutoff May 2025. Validate current formats before implementing Phase 3 provider-specific parsing.
 
 ## Sources
 
-**Stack Research:**
-- Hono documentation (framework features, streaming, Node.js adapter)
-- better-sqlite3 documentation (API, WAL mode, performance)
-- Drizzle ORM documentation (SQLite adapter, schema definition)
-- Vite documentation (build tool, React plugin)
-- TanStack Query documentation (server state management)
-- OpenAI API reference (endpoint shapes, SSE format)
-- Zod, Pino, shadcn/ui documentation
+### Primary (HIGH confidence)
+- [Supabase RLS Official Docs](https://supabase.com/docs/guides/database/postgres/row-level-security) — auth.uid(), service role, WITH CHECK, performance
+- [Supabase Auth: Password-based Auth](https://supabase.com/docs/guides/auth/passwords) — signup, signIn, session management
+- [Supabase: Connect to Postgres](https://supabase.com/docs/guides/database/connecting-to-postgres) — session pooler requirement for long-running servers
+- [Supabase: Use with Hono](https://supabase.com/docs/guides/getting-started/quickstarts/hono) — official Hono integration patterns
+- [Supabase: JWT signing keys](https://supabase.com/docs/guides/auth/signing-keys) — asymmetric keys default post-May 2025
+- [Supabase RLS Performance and Best Practices](https://supabase.com/docs/guides/troubleshooting/rls-performance-and-best-practices-Z5Jjwv) — index requirements, LEAKPROOF functions
+- [jose npm](https://www.npmjs.com/package/jose) — v6.1.3 verified, ESM-only, JWKS support
+- [@supabase/supabase-js npm](https://www.npmjs.com/package/@supabase/supabase-js) — v2.98.0 verified March 2026
+- [postgres npm](https://www.npmjs.com/package/postgres) — v3.4.8 verified March 2026
+- [Hono Context API](https://hono.dev/docs/api/context) — typed context variables
 
-**Feature Research:**
-- LiteLLM documentation and GitHub repository (as of early 2025)
-- OpenRouter API documentation (as of early 2025)
-- Portkey AI gateway documentation (as of early 2025)
-- Helicone observability platform (as of early 2025)
-- Cloudflare AI Gateway (as of early 2025)
+### Secondary (MEDIUM confidence)
+- [Common Postgres RLS Footguns — Bytebase](https://www.bytebase.com/blog/postgres-row-level-security-footguns/) — 16 concrete RLS footguns including WITH CHECK, SECURITY DEFINER, unique constraint leakage
+- [Multi-tenant data isolation with PostgreSQL RLS — AWS](https://aws.amazon.com/blogs/database/multi-tenant-data-isolation-with-postgresql-row-level-security/) — connection pooling and SET LOCAL patterns
+- [Top LLM Gateways 2025 — Helicone blog](https://www.helicone.ai/blog/top-llm-gateways-comparison-2025) — competitor feature comparison (verified via WebFetch)
+- [Multi-Tenant Applications with RLS on Supabase — AntStack](https://www.antstack.com/blog/multi-tenant-applications-with-rls-on-supabase-postgress/) — practical implementation patterns
+- LiteLLM project architecture and GitHub issues — proxy architecture patterns, SSE streaming pitfalls
+- OpenAI API specification and SDK behavior — OpenAI-compatible contract requirements
 
-**Architecture Research:**
-- LiteLLM proxy architecture (Python-based AI gateway)
-- Portkey AI Gateway architecture (TypeScript-based gateway)
-- OpenAI API specification (endpoint shapes, SSE format, response structures)
-- API gateway design patterns (circuit breaker, token bucket, sliding window)
-- Node.js streaming best practices (Transform streams, backpressure handling)
-
-**Pitfall Research:**
-- LiteLLM GitHub issues (SSE streaming, provider integration, rate limiting)
-- Portkey architecture documentation (proxy patterns, adapter layer)
-- OpenAI API specification (SDK expectations)
-- Node.js streaming gotchas (buffering, backpressure, AbortController)
-- Provider-specific API behaviors (OpenRouter, Groq, Cerebras)
-
-**Source Confidence Note:** All sources are from training data (cutoff May 2025). WebSearch and WebFetch were unavailable during research. Version numbers and provider-specific details should be verified before implementation. Architectural recommendations and patterns are HIGH confidence — these are well-established tools unlikely to have been superseded in the ~9 months since training cutoff.
+### Tertiary (LOW confidence — validate before relying on)
+- Current provider rate limit header formats (OpenRouter, Groq, Cerebras) — from v1.0 research; based on training data May 2025; must be revalidated against current provider documentation before implementing provider-specific parsing
 
 ---
-*Research completed: 2026-02-05*
+*Research completed: 2026-03-01*
 *Ready for roadmap: yes*

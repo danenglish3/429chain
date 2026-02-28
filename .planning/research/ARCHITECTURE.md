@@ -1,714 +1,744 @@
 # Architecture Research
 
-**Domain:** AI inference proxy/aggregator
-**Researched:** 2026-02-05
-**Confidence:** MEDIUM (based on training knowledge of LiteLLM, Portkey Gateway, and proxy design patterns; unable to verify against live sources due to tool unavailability)
+**Domain:** Multi-tenant SaaS integration into existing Hono + React proxy
+**Researched:** 2026-03-01
+**Confidence:** HIGH (core patterns verified against official Supabase and Hono docs)
+
+---
 
 ## Standard Architecture
 
 ### System Overview
 
-AI inference proxies follow a layered gateway pattern. The system sits between callers (any OpenAI SDK client) and upstream AI providers. This is architecturally similar to an API gateway or reverse proxy, but specialized for LLM inference with streaming, token accounting, and intelligent failover.
-
 ```
-                            429chain System
- +-----------------------------------------------------------------+
- |                                                                   |
- |  Callers          API Layer        Core Engine       Providers    |
- |  (OpenAI SDK)                                                     |
- |                 +-------------+  +---------------+                |
- |   POST /v1/ -->| Auth        |->| Chain Router  |---> OpenRouter  |
- |   chat/       | Middleware   |  |               |                |
- |   completions | OpenAI      |  | +----------+  |---> Groq        |
- |               | Compat Layer|  | | Rate Limit|  |                |
- |   SSE <------| SSE Bridge   |<-| | Tracker   |  |---> Cerebras   |
- |               +-------------+  | +----------+  |                |
- |                                |               |---> [Provider N]|
- |                 +-------------+  | +----------+  |                |
- |   Browser ---->| Web UI      |  | | Cooldown  |  |                |
- |               | (Dashboard) |  | | Manager   |  |                |
- |               +-------------+  | +----------+  |                |
- |                                +---------------+                |
- |                                      |                           |
- |                              +---------------+                   |
- |                              | Persistence   |                   |
- |                              | (Config + Log)|                   |
- |                              +---------------+                   |
- +-----------------------------------------------------------------+
-```
-
-### Layered Architecture
-
-The system has five distinct layers, each with clear boundaries:
-
-```
-+----------------------------------------------------------+
-|  Layer 1: HTTP Surface (Express/Fastify)                  |
-|  - OpenAI-compatible endpoints                            |
-|  - API key authentication middleware                      |
-|  - Request validation                                     |
-|  - SSE response management                                |
-|  - Web UI static file serving + API routes                |
-+----------------------------------------------------------+
-         |                              ^
-         v                              |
-+----------------------------------------------------------+
-|  Layer 2: Request Orchestration                           |
-|  - Chain resolution (which chain for this request?)       |
-|  - Waterfall execution loop                               |
-|  - Retry/timeout logic                                    |
-|  - Response normalization                                 |
-+----------------------------------------------------------+
-         |                              ^
-         v                              |
-+----------------------------------------------------------+
-|  Layer 3: Provider Intelligence                           |
-|  - Rate limit tracking (proactive + reactive)             |
-|  - Cooldown timers per provider+model                     |
-|  - Provider availability scoring                          |
-|  - Header parsing for rate limit info                     |
-+----------------------------------------------------------+
-         |                              ^
-         v                              |
-+----------------------------------------------------------+
-|  Layer 4: Provider Adapters                               |
-|  - HTTP client per provider                               |
-|  - Request translation (OpenAI -> provider format)        |
-|  - Response translation (provider -> OpenAI format)       |
-|  - SSE stream passthrough/transformation                  |
-|  - Header extraction (rate limit headers)                 |
-+----------------------------------------------------------+
-         |                              ^
-         v                              |
-+----------------------------------------------------------+
-|  Layer 5: Persistence & Config                            |
-|  - Config file read/write (YAML or JSON)                  |
-|  - Usage/stats logging                                    |
-|  - Request history                                        |
-|  - In-memory state with periodic flush                    |
-+----------------------------------------------------------+
+┌──────────────────────────────────────────────────────────────────┐
+│                        React 19 + Vite SPA                        │
+│                                                                    │
+│  ┌──────────────┐  ┌────────────────────┐  ┌───────────────────┐  │
+│  │  AuthContext │  │  Authenticated App │  │  Login/Signup UI  │  │
+│  │  (session,   │  │  (existing pages:  │  │  (new: Login.tsx, │  │
+│  │   userId,    │  │   Dashboard,       │  │   Signup.tsx)     │  │
+│  │   supabase   │  │   Providers,       │  └─────────┬─────────┘  │
+│  │   client)    │  │   Chains, Test)    │            │            │
+│  └──────┬───────┘  └────────────────────┘            │            │
+│         │   session.access_token added to             │            │
+│         │   all /v1/ API calls                        │ signUp /   │
+│         │   (replaces old API key input)              │ signIn     │
+└─────────┼───────────────────────────────────────────┬─┼────────────┘
+          │ Bearer <jwt>                               │ │
+          │                                           │ │
+          ▼                                           ▼ ▼
+┌──────────────────────────────────────────────────────────────────┐
+│                        Hono HTTP Server                           │
+│                                                                    │
+│  /health  (no auth, unchanged)                                     │
+│                                                                    │
+│  /v1/*  ─── mode-gated auth:                                       │
+│             self-hosted: createAuthMiddleware() (API key, TODAY)   │
+│             saas:        createSupabaseAuthMiddleware() (NEW)       │
+│             │  verifies JWT via supabase.auth.getUser(token)        │
+│             │  sets c.var.userId (string)                           │
+│             ▼                                                       │
+│         ┌───────────────────────────────────────────────────────┐  │
+│         │  Route Handlers (unchanged signatures)                │  │
+│         │                                                        │  │
+│         │  /admin/*  ──── IAdminRepository (NEW interface)      │  │
+│         │  /stats/*  ──── IStatsRepository (NEW interface)      │  │
+│         │  /chat/*   ──── unchanged waterfall logic             │  │
+│         │                 requestLogger gains userId param       │  │
+│         └───────────────────────────────────────────────────────┘  │
+│                                                                    │
+│  Static SPA fallback (unchanged)                                   │
+└──────────────────────────────────────────────────────────────────┘
+          │                              │
+          ▼                              ▼
+┌─────────────────┐         ┌───────────────────────────────────────┐
+│  SQLiteAdapter  │         │          SupabaseAdapter               │
+│  (self-hosted   │         │  (SaaS mode, MODE=saas env var)        │
+│   mode,         │         │                                        │
+│   better-sqlite3│         │  service-role client (server writes)   │
+│   unchanged)    │         │  user JWT client (RLS-enforced reads)  │
+└─────────────────┘         └───────────────────────────────────────┘
+          │                              │
+          ▼                              ▼
+┌─────────────────┐         ┌───────────────────────────────────────┐
+│  SQLite file    │         │  Supabase Postgres                     │
+│  (WAL mode)     │         │  - providers (user_id FK)              │
+│                 │         │  - chains + chain_entries (user_id FK) │
+│  Existing       │         │  - request_logs (user_id FK)           │
+│  schema         │         │  - usage aggregates (user_id FK)       │
+│  unchanged      │         │  + RLS policies on all tables          │
+│                 │         │  + Supabase Auth (managed users table) │
+└─────────────────┘         └───────────────────────────────────────┘
 ```
 
 ### Component Responsibilities
 
-| Component | Responsibility | Typical Implementation |
-|-----------|----------------|------------------------|
-| **HTTP Server** | Accept OpenAI-format requests, serve Web UI | Express or Fastify with middleware stack |
-| **Auth Middleware** | Validate proxy API keys on incoming requests | Middleware that checks `Authorization: Bearer` header against configured keys |
-| **OpenAI Compat Layer** | Validate request shape, ensure OpenAI-format responses | Request/response schemas matching OpenAI's chat/completions spec |
-| **Chain Router** | Select which chain to use, execute waterfall logic | Core orchestrator that iterates through chain entries |
-| **Rate Limit Tracker** | Track remaining capacity per provider+model | In-memory map updated from response headers and 429 events |
-| **Cooldown Manager** | Temporarily exclude exhausted providers | Timer-based system that marks providers unavailable until reset |
-| **Provider Adapter** | Translate between OpenAI format and provider-specific APIs | Adapter pattern -- one adapter per provider type |
-| **SSE Bridge** | Stream upstream SSE responses back to caller | Transform/passthrough upstream `text/event-stream` to client |
-| **Usage Tracker** | Count tokens, requests, latency per provider and chain | Event-driven collector aggregating metrics |
-| **Config Manager** | Load/save/validate configuration | File-based config with in-memory cache, exposed via Web UI API |
-| **Web UI Backend** | REST API for dashboard operations | Express routes for CRUD on providers, chains, viewing stats |
-| **Web UI Frontend** | Browser-based management dashboard | React/Vue SPA or lightweight vanilla JS served as static files |
-| **Persistence Layer** | Durable storage for config, logs, stats | JSON/YAML files, SQLite for logs if needed |
+| Component | Responsibility | Existing or New |
+|-----------|----------------|-----------------|
+| `createAuthMiddleware` | API key validation (Bearer token vs config) | **UNCHANGED** (self-hosted only) |
+| `createSupabaseAuthMiddleware` | JWT verification via `getUser()`, sets `c.var.userId` | **NEW** (SaaS mode) |
+| `IAdminRepository` | Interface for provider/chain CRUD | **NEW** |
+| `IStatsRepository` | Interface for request logs and aggregates | **NEW** |
+| `SQLiteAdminRepository` | Implements IAdminRepository via configRef + YAML write | **NEW** (wraps existing admin logic) |
+| `SQLiteStatsRepository` | Implements IStatsRepository via existing RequestLogger + Aggregator | **NEW** (thin wrapper) |
+| `SupabaseAdminRepository` | Implements IAdminRepository via Postgres + RLS | **NEW** |
+| `SupabaseStatsRepository` | Implements IStatsRepository via Postgres + RLS | **NEW** |
+| `repositoryFactory` | Returns correct adapter pair based on `MODE` env var | **NEW** |
+| `supabase/client.ts` | Service-role singleton + per-request user client factory | **NEW** |
+| `AuthContext.tsx` | React context holding session, userId, signOut | **NEW** |
+| `Login.tsx` / `Signup.tsx` | Email/password auth forms using `supabase.auth` | **NEW** |
+| `ProtectedRoute` | Redirects unauthenticated users to `/login` | **NEW** |
+| `ui/src/lib/supabase.ts` | Frontend Supabase client singleton | **NEW** |
+| `ui/src/lib/api.ts` | Sends `session.access_token` as Bearer token | **MODIFIED** |
+| `ui/src/components/Layout.tsx` | Replace API key input with auth status + logout | **MODIFIED** |
+| `ui/src/main.tsx` | Add AuthProvider wrapper, /login + /signup routes | **MODIFIED** |
+| `src/index.ts` | Mode detection, repository factory, auth middleware selection | **MODIFIED** |
+| `createAdminRoutes` | Receives `IAdminRepository` instead of raw configRef/registry | **MODIFIED** |
+| `createStatsRoutes` | Receives `IStatsRepository` instead of raw Aggregator | **MODIFIED** |
+| All other route factories | Unchanged signatures and logic | **UNCHANGED** |
+
+---
 
 ## Recommended Project Structure
 
+New files and folders only. Existing structure is preserved.
+
 ```
 src/
-├── index.ts                    # Entry point: bootstrap server
-├── server.ts                   # HTTP server setup (Express/Fastify)
+├── api/
+│   └── middleware/
+│       ├── auth.ts              # EXISTING: API key middleware (unchanged)
+│       └── supabase-auth.ts     # NEW: JWT verification middleware for SaaS mode
 │
-├── api/                        # Layer 1: HTTP Surface
-│   ├── routes/
-│   │   ├── chat.ts             # POST /v1/chat/completions (the core proxy endpoint)
-│   │   ├── models.ts           # GET /v1/models (list available models/chains)
-│   │   └── health.ts           # GET /health
-│   ├── middleware/
-│   │   ├── auth.ts             # API key validation
-│   │   ├── validate.ts         # Request body validation
-│   │   └── error-handler.ts    # Global error handling
-│   └── admin/
-│       ├── providers.ts        # CRUD for provider configurations
-│       ├── chains.ts           # CRUD for chain configurations
-│       ├── stats.ts            # Usage statistics endpoints
-│       └── test.ts             # Test endpoint (send prompt, see routing)
+├── persistence/                 # EXISTING folder
+│   ├── db.ts                    # EXISTING: SQLite init (unchanged)
+│   ├── schema.ts                # EXISTING: SQLite migrations (unchanged)
+│   ├── request-logger.ts        # EXISTING: SQLite request logger (unchanged)
+│   ├── aggregator.ts            # EXISTING: SQLite aggregator (unchanged)
+│   │
+│   └── repositories/            # NEW folder
+│       ├── types.ts             # NEW: IAdminRepository, IStatsRepository interfaces
+│       ├── factory.ts           # NEW: repositoryFactory() — selects impl by MODE
+│       ├── sqlite/
+│       │   ├── admin.ts         # NEW: SQLiteAdminRepository (wraps config/registry/YAML)
+│       │   └── stats.ts         # NEW: SQLiteStatsRepository (wraps RequestLogger + Aggregator)
+│       └── supabase/
+│           ├── client.ts        # NEW: service-role singleton + user client factory
+│           ├── admin.ts         # NEW: SupabaseAdminRepository
+│           ├── stats.ts         # NEW: SupabaseStatsRepository
+│           └── migrations.sql   # NEW: Postgres schema + RLS policy definitions
 │
-├── core/                       # Layer 2: Request Orchestration
-│   ├── chain-router.ts         # Chain selection + waterfall execution
-│   ├── request-context.ts      # Per-request context object (timing, attempts, etc.)
-│   └── response-builder.ts     # Normalize responses to OpenAI format
+ui/src/
+├── lib/
+│   ├── api.ts                   # MODIFIED: read session.access_token as Bearer
+│   ├── supabase.ts              # NEW: createClient(VITE_SUPABASE_URL, VITE_ANON_KEY)
+│   └── queryKeys.ts             # EXISTING: unchanged
 │
-├── providers/                  # Layer 3+4: Provider Intelligence & Adapters
-│   ├── registry.ts             # Provider registry (available providers)
-│   ├── base-adapter.ts         # Abstract base class for provider adapters
-│   ├── adapters/
-│   │   ├── openrouter.ts       # OpenRouter-specific adapter
-│   │   ├── groq.ts             # Groq-specific adapter
-│   │   ├── cerebras.ts         # Cerebras-specific adapter
-│   │   └── generic-openai.ts   # Generic OpenAI-compatible adapter (fallback)
-│   └── rate-limit/
-│       ├── tracker.ts          # Rate limit state machine per provider+model
-│       ├── header-parser.ts    # Parse x-ratelimit-* headers from responses
-│       ├── cooldown.ts         # Cooldown timer management
-│       └── types.ts            # Rate limit data types
+├── contexts/
+│   └── AuthContext.tsx          # NEW: session state, onAuthStateChange, Provider + hook
 │
-├── streaming/                  # SSE handling
-│   ├── sse-bridge.ts           # Pipe upstream SSE to downstream client
-│   ├── sse-parser.ts           # Parse SSE events from upstream
-│   └── sse-writer.ts           # Write SSE events to client response
+├── pages/
+│   ├── Login.tsx                # NEW: email/password sign-in form
+│   ├── Signup.tsx               # NEW: email/password sign-up form
+│   ├── Dashboard.tsx            # EXISTING: unchanged
+│   ├── Providers.tsx            # EXISTING: unchanged
+│   ├── Chains.tsx               # EXISTING: unchanged
+│   └── Test.tsx                 # EXISTING: unchanged
 │
-├── tracking/                   # Usage tracking & metrics
-│   ├── usage-collector.ts      # Event-driven usage data collection
-│   ├── aggregator.ts           # Roll up stats per provider, chain, time window
-│   └── request-log.ts          # Request-level logging
+├── components/
+│   ├── Layout.tsx               # MODIFIED: replace API key input with auth status/logout
+│   └── ProtectedRoute.tsx       # NEW: redirect to /login if no session
 │
-├── config/                     # Layer 5: Configuration & Persistence
-│   ├── manager.ts              # Load/save/watch config files
-│   ├── schema.ts               # Config validation schemas (Zod)
-│   ├── defaults.ts             # Default configuration values
-│   └── types.ts                # Config type definitions
-│
-├── persistence/                # Storage abstraction
-│   ├── store.ts                # Abstract storage interface
-│   ├── json-store.ts           # JSON file-based implementation
-│   └── sqlite-store.ts         # Optional SQLite for request logs (future)
-│
-├── ui/                         # Web UI
-│   └── (built frontend assets, served statically)
-│
-└── shared/                     # Cross-cutting concerns
-    ├── types.ts                # Shared type definitions
-    ├── errors.ts               # Custom error classes
-    ├── logger.ts               # Structured logging
-    └── events.ts               # Event bus for decoupled communication
+└── main.tsx                     # MODIFIED: AuthProvider wrap, /login + /signup routes,
+                                 #           ProtectedRoute on existing app routes
 ```
 
-### Structure Rationale
-
-**Why this separation:**
-
-1. **`api/` vs `core/` boundary:** The API layer handles HTTP concerns (parsing, auth, response formatting). The core layer handles business logic (chain resolution, waterfall). This means you could theoretically swap Express for Fastify without touching core logic.
-
-2. **`providers/` encapsulates provider knowledge:** Each provider adapter knows how to translate requests and extract rate limit information. The core chain router does not need to know provider-specific details -- it just calls `adapter.complete(request)` and gets an OpenAI-format response.
-
-3. **`streaming/` is its own concern:** SSE handling is complex enough to warrant isolation. The SSE bridge must handle backpressure, error mid-stream, partial chunks, and clean termination. Keeping this separate from provider adapters prevents duplication.
-
-4. **`tracking/` is event-driven:** Usage collection is a side effect, not part of the critical request path. Using an event bus (`shared/events.ts`) lets the chain router emit events that the tracker consumes without coupling.
-
-5. **`config/` vs `persistence/`:** Config is structured, validated, and cached in memory. Persistence is generic storage. Config uses persistence, but persistence could also store logs, stats, etc.
-
-6. **`shared/` for cross-cutting:** Types, errors, and the event bus are used across all layers. They live in a shared directory to avoid circular dependencies.
+---
 
 ## Architectural Patterns
 
-### Pattern 1: Chain of Responsibility (Waterfall Execution)
+### Pattern 1: Mode-Gated Repository Factory
 
-The core routing pattern. A request walks through an ordered chain of provider+model entries. Each entry either handles the request or passes it to the next.
+**What:** A single `repositoryFactory()` reads `process.env.MODE` at startup and returns the correct repository implementation pair. Route factories receive repository interfaces and are unaware of which backend is active.
 
-**Why this pattern:** It maps directly to the "waterfall" requirement. The chain is an ordered list; each entry is tried in sequence. Unlike load balancing (which distributes), waterfall is strictly ordered with fallback semantics.
+**When to use:** Exactly this dual-backend scenario. Same business logic, two storage backends. The factory is the single decision point.
+
+**Trade-offs:** Simple and explicit. Does not support runtime switching (restart required). Adding a third backend is one new implementation class.
 
 ```typescript
-// Conceptual chain execution
-interface ChainEntry {
-  providerId: string;
-  modelId: string;
-  priority: number;  // position in chain
+// src/persistence/repositories/types.ts
+export interface IAdminRepository {
+  listProviders(userId: string): Promise<ProviderConfig[]>;
+  upsertProvider(userId: string, provider: ProviderConfig): Promise<void>;
+  deleteProvider(userId: string, id: string): Promise<void>;
+  listChains(userId: string): Promise<ChainConfig[]>;
+  upsertChain(userId: string, chain: ChainConfig): Promise<void>;
+  deleteChain(userId: string, name: string): Promise<void>;
 }
 
-interface Chain {
-  id: string;
-  name: string;
-  entries: ChainEntry[];
+export interface IStatsRepository {
+  logRequest(userId: string, entry: RequestLogEntry): Promise<void>;
+  getProviderStats(userId: string): Promise<ProviderStat[]>;
+  getChainStats(userId: string): Promise<ChainStat[]>;
+  getRequests(userId: string, limit: number): Promise<RequestLogEntry[]>;
+  getSummary(userId: string): Promise<SummaryStats>;
 }
 
-async function executeChain(
-  chain: Chain,
-  request: ChatCompletionRequest,
-  context: RequestContext
-): Promise<ChatCompletionResponse | ReadableStream> {
+// src/persistence/repositories/factory.ts
+export function repositoryFactory(mode: 'sqlite' | 'supabase', deps: FactoryDeps) {
+  if (mode === 'supabase') {
+    const client = getSupabaseServiceClient(deps.supabaseUrl, deps.supabaseServiceKey);
+    return {
+      admin: new SupabaseAdminRepository(client),
+      stats: new SupabaseStatsRepository(client),
+    };
+  }
+  return {
+    admin: new SQLiteAdminRepository(
+      deps.configRef, deps.configPath, deps.registry, deps.chains
+    ),
+    stats: new SQLiteStatsRepository(deps.requestLogger, deps.aggregator),
+  };
+}
+```
 
-  for (const entry of chain.entries) {
-    // Check: is this entry available?
-    if (rateLimitTracker.isExhausted(entry.providerId, entry.modelId)) {
-      context.log(`Skipping ${entry.providerId}/${entry.modelId}: rate limited`);
-      continue; // proactive skip
+### Pattern 2: Hono Typed Context Variables for Tenant Propagation
+
+**What:** The SaaS auth middleware sets `userId` as a typed Hono context variable via `c.set('userId', user.id)`. Route handlers read `c.var.userId` — no prop-drilling, no global state, type-safe.
+
+**When to use:** Anytime middleware needs to pass per-request data downstream to handlers.
+
+**Trade-offs:** Type-safe when `Variables` generic is declared on the Hono app. In self-hosted mode the variable is never set and handlers pass an empty string to repositories (which SQLite implementations ignore). This is intentional.
+
+```typescript
+// src/api/middleware/supabase-auth.ts
+import { createMiddleware } from 'hono/factory';
+import { createClient } from '@supabase/supabase-js';
+
+type AuthEnv = {
+  Variables: {
+    userId: string;
+  };
+};
+
+export function createSupabaseAuthMiddleware(supabaseUrl: string, supabaseAnonKey: string) {
+  return createMiddleware<AuthEnv>(async (c, next) => {
+    const authorization = c.req.header('authorization');
+    if (!authorization?.startsWith('Bearer ')) {
+      return c.json(
+        { error: { message: 'Missing authorization', code: 'invalid_api_key' } },
+        401,
+      );
     }
 
-    try {
-      const adapter = providerRegistry.getAdapter(entry.providerId);
-      const result = await adapter.complete(entry.modelId, request);
+    const token = authorization.slice('Bearer '.length);
 
-      // Update rate limit state from response headers
-      rateLimitTracker.update(entry.providerId, entry.modelId, result.headers);
+    // getUser() verifies token against Supabase Auth server on every request.
+    // More secure than getClaims() for server-side use — cannot be spoofed.
+    // Switch to getClaims() later if latency is a concern and project uses
+    // asymmetric (RSA/ECC) signing keys (local verification, no network call).
+    const userClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: `Bearer ${token}` } },
+      auth: { persistSession: false },
+    });
+    const { data: { user }, error } = await userClient.auth.getUser();
 
-      // Track usage
-      events.emit('request:success', { entry, request, result, context });
-
-      return result.body; // success -- return to caller
-    } catch (error) {
-      if (is429(error) || isProviderError(error)) {
-        // Mark as exhausted, set cooldown
-        rateLimitTracker.markExhausted(entry.providerId, entry.modelId, error);
-        context.log(`${entry.providerId}/${entry.modelId} failed: ${error.status}`);
-
-        events.emit('request:fallback', { entry, error, context });
-        continue; // try next entry in chain
-      }
-      throw error; // unexpected error, don't waterfall
+    if (error || !user) {
+      return c.json(
+        { error: { message: 'Invalid token', code: 'invalid_api_key' } },
+        401,
+      );
     }
+
+    c.set('userId', user.id);
+    await next();
+  });
+}
+```
+
+### Pattern 3: SQLite Repository Wraps Existing Logic Without Changing It
+
+**What:** `SQLiteAdminRepository` takes `configRef`, `configPath`, `registry`, and `chains` in its constructor — the same deps the route factory receives today. The implementation delegates to the exact same mutations that exist in the route handler now.
+
+**When to use:** This is the migration strategy: extract existing behavior into a named class before abstracting.
+
+**Trade-offs:** Self-hosted behavior is 100% preserved. The "repository" is really a YAML+memory store, not a database. This naming is intentional — it satisfies the interface without inventing a new storage system for self-hosted users.
+
+```typescript
+// src/persistence/repositories/sqlite/admin.ts
+export class SQLiteAdminRepository implements IAdminRepository {
+  constructor(
+    private configRef: { current: Config },
+    private configPath: string,
+    private registry: ProviderRegistry,
+    private chains: Map<string, Chain>,
+  ) {}
+
+  // userId is ignored — single-user mode, all data belongs to one instance
+  async listProviders(_userId: string): Promise<ProviderConfig[]> {
+    return Promise.resolve([...this.configRef.current.providers]);
   }
 
-  // All entries exhausted
-  throw new AllProvidersExhaustedError(chain.id, context.attempts);
+  async upsertProvider(_userId: string, provider: ProviderConfig): Promise<void> {
+    const idx = this.configRef.current.providers.findIndex((p) => p.id === provider.id);
+    if (idx !== -1) {
+      this.configRef.current.providers[idx] = provider;
+    } else {
+      this.configRef.current.providers.push(provider);
+    }
+    const adapter = createAdapter(provider);
+    this.registry.add(provider.id, adapter);
+    writeConfig(this.configPath, this.configRef.current);
+    return Promise.resolve();
+  }
+
+  // ... deleteProvider, listChains, upsertChain, deleteChain follow same pattern
 }
 ```
 
-**Key design decision:** Proactive skipping (checking rate limit state before attempting) is important for performance. Without it, every request would sequentially hit rate-limited providers and wait for 429 responses, adding latency.
+### Pattern 4: Supabase Per-Request User Client for RLS
 
-### Pattern 2: Adapter Pattern (Provider Abstraction)
+**What:** Two Supabase clients with distinct roles. A service-role client (singleton, bypasses RLS) is used only for writes where the server must set `user_id`. A per-request client initialized with the user's JWT is used for queries — the JWT causes Postgres to evaluate RLS policies automatically via `auth.uid()`.
 
-Each AI provider has slightly different API shapes, auth methods, rate limit headers, and streaming formats. The adapter pattern normalizes this.
+**When to use:** Standard Supabase server-side pattern for multi-tenant data. The service-role key MUST stay server-side only (non-VITE env var).
+
+**Trade-offs:** Per-request client creation has negligible overhead with `@supabase/supabase-js`. Using the service-role client for queries would silently bypass RLS and expose all users' data — a critical security defect.
 
 ```typescript
-abstract class BaseProviderAdapter {
-  abstract readonly providerId: string;
+// src/persistence/repositories/supabase/client.ts
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-  // Core method: send a completion request
-  abstract complete(
-    modelId: string,
-    request: ChatCompletionRequest,
-    options: { stream: boolean }
-  ): Promise<ProviderResponse>;
+let serviceClient: SupabaseClient | null = null;
 
-  // Parse rate limit headers from this provider's response
-  abstract parseRateLimitHeaders(headers: Headers): RateLimitInfo | null;
+// Singleton — bypasses RLS, server-only operations (e.g., insert with explicit user_id)
+export function getSupabaseServiceClient(url: string, serviceKey: string): SupabaseClient {
+  if (!serviceClient) {
+    serviceClient = createClient(url, serviceKey, {
+      auth: { persistSession: false },
+    });
+  }
+  return serviceClient;
+}
 
-  // Map provider-specific error to standard error
-  abstract normalizeError(error: unknown): ProviderError;
-
-  // List available models (for UI)
-  abstract listModels(): Promise<ModelInfo[]>;
+// Per-request — user JWT triggers RLS policies for all queries
+export function createUserScopedClient(url: string, anonKey: string, jwt: string): SupabaseClient {
+  return createClient(url, anonKey, {
+    global: { headers: { Authorization: `Bearer ${jwt}` } },
+    auth: { persistSession: false },
+  });
 }
 ```
 
-**Why needed:** Even among "OpenAI-compatible" providers, there are differences:
-- OpenRouter uses `HTTP-Referer` and `X-Title` headers
-- Groq has specific rate limit header formats
-- Some providers use different SSE chunk formats
-- Auth header formats can vary (Bearer vs custom)
+### Pattern 5: React AuthContext with onAuthStateChange
 
-The generic-openai adapter handles 80% of cases (any provider with a standard OpenAI-compatible endpoint), while specific adapters handle provider quirks.
+**What:** A React context holds the Supabase session, exposes `userId` and a `signOut` helper. All components read from this context. Session is persisted to `localStorage` automatically by the Supabase client. The `onAuthStateChange` subscription keeps the context current across tab refreshes and token auto-refresh.
 
-### Pattern 3: Event-Driven Side Effects
+**When to use:** Standard React Supabase integration. Centralizes session logic so no page calls `getSession()` independently.
 
-Usage tracking, logging, and metrics should not be in the critical request path. An event bus decouples these.
+**Trade-offs:** `getSession()` reads from localStorage without network verification — fine for UI display (gating renders). The actual security enforcement is the Bearer JWT the server verifies. Never use client-side session data to authorize sensitive operations — that happens on the server.
 
 ```typescript
-// Event bus (simple typed EventEmitter)
-const events = new TypedEventEmitter<{
-  'request:start':    { chain: Chain, request: ChatCompletionRequest, context: RequestContext };
-  'request:success':  { entry: ChainEntry, result: ProviderResponse, context: RequestContext };
-  'request:fallback': { entry: ChainEntry, error: ProviderError, context: RequestContext };
-  'request:failed':   { chain: Chain, context: RequestContext };
-  'ratelimit:update': { providerId: string, modelId: string, info: RateLimitInfo };
-  'ratelimit:exhausted': { providerId: string, modelId: string, cooldownMs: number };
-}>();
+// ui/src/contexts/AuthContext.tsx
+import { createContext, useContext, useEffect, useState } from 'react';
+import type { Session } from '@supabase/supabase-js';
+import { supabase } from '../lib/supabase.js';
 
-// Usage tracking subscribes to events
-events.on('request:success', (data) => {
-  usageCollector.recordSuccess(data);
+interface AuthContextValue {
+  session: Session | null;
+  userId: string | null;
+  loading: boolean;
+  signOut: () => Promise<void>;
+}
+
+const AuthContext = createContext<AuthContextValue>({
+  session: null, userId: null, loading: true, signOut: async () => {},
 });
 
-events.on('request:fallback', (data) => {
-  usageCollector.recordFallback(data);
-});
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [session, setSession] = useState<Session | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Read cached session from localStorage (no network)
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setLoading(false);
+    });
+
+    // Live updates: login, logout, token refresh
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  return (
+    <AuthContext.Provider value={{
+      session,
+      userId: session?.user?.id ?? null,
+      loading,
+      signOut: () => supabase.auth.signOut(),
+    }}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+export const useAuth = () => useContext(AuthContext);
 ```
 
-**Why this matters:** If usage tracking throws an error or is slow, it should never affect the caller's response. Events make this naturally isolated.
-
-### Pattern 4: SSE Passthrough with Interception
-
-Streaming is the most architecturally complex piece. The proxy must:
-1. Open an SSE connection upstream to the provider
-2. Pipe chunks downstream to the caller
-3. Intercept chunks for token counting (the final chunk contains usage data)
-4. Handle mid-stream errors (provider dies mid-response)
-5. Handle mid-stream 429 (rare but possible with some providers)
-
-```
-Caller <--SSE-- [SSE Bridge] <--SSE-- Provider
-                     |
-                     +--> Token counter (intercepts final chunk)
-                     +--> Error handler (detects mid-stream failure)
-```
-
-**Critical decision: What happens when streaming fails mid-response?**
-
-Options:
-- **A) Send error event in SSE stream, caller handles it.** This is the standard approach. The OpenAI SSE format supports error events. Callers must handle partial responses.
-- **B) Buffer the entire response, only send when complete.** Defeats the purpose of streaming. Do not do this.
-- **C) Transparent retry with a new provider mid-stream.** Extremely complex, requires buffering sent chunks and replaying context. Not worth it for v1.
-
-**Recommendation: Option A.** Send an SSE error event if a provider fails mid-stream. For non-streaming requests, waterfall retry is automatic (the response hasn't been sent yet).
-
-### Pattern 5: Rate Limit State Machine
-
-Each provider+model pair has a rate limit state:
-
-```
-                   +-----------+
-         ------->  | AVAILABLE |  <-- initial state
-        |          +-----------+
-        |               |
-        |     response headers OR 429
-        |               |
-        |               v
-        |    +-------------------+
-        |    | TRACKING          |  <-- headers parsed, remaining > 0
-        |    | remaining: N      |
-        |    | resets_at: T      |
-        |    +-------------------+
-        |               |
-        |        remaining == 0 OR 429 received
-        |               |
-        |               v
-        |    +-------------------+
-        +----| EXHAUSTED         |  <-- cooldown active
-             | cooldown_until: T |
-             +-------------------+
-                     |
-              timer expires (cooldown_until reached)
-                     |
-                     v
-              back to AVAILABLE
-```
-
-Rate limit information sources (in priority order):
-1. **Response headers** (proactive): `x-ratelimit-remaining`, `x-ratelimit-reset` -- most reliable
-2. **429 response headers** (reactive): Often include `retry-after` or reset time
-3. **Manual config** (fallback): User-specified RPM, daily token caps
-4. **Learned patterns** (heuristic): If a provider consistently 429s at ~60 RPM, learn that threshold
+---
 
 ## Data Flow
 
-### Request Flow (Non-Streaming)
+### Request Flow — SaaS Mode (Chat Completion)
 
 ```
-Client                  429chain                              Provider A    Provider B
-  |                        |                                      |             |
-  |-- POST /v1/chat/completions (OpenAI format) -->|              |             |
-  |                        |                                      |             |
-  |                   [Auth middleware]                            |             |
-  |                   [Validate request]                          |             |
-  |                   [Resolve chain]                             |             |
-  |                        |                                      |             |
-  |                   [Check rate limit: Provider A]               |             |
-  |                   [Status: AVAILABLE]                          |             |
-  |                        |                                      |             |
-  |                        |-- POST /chat/completions ----------->|             |
-  |                        |                                      |             |
-  |                        |<---------- 429 Too Many Requests ----|             |
-  |                        |                                      |             |
-  |                   [Mark Provider A EXHAUSTED]                  |             |
-  |                   [Parse retry-after header]                   |             |
-  |                   [Set cooldown timer]                         |             |
-  |                        |                                      |             |
-  |                   [Check rate limit: Provider B]               |             |
-  |                   [Status: AVAILABLE]                          |             |
-  |                        |                                      |             |
-  |                        |-- POST /chat/completions ----------------------->|
-  |                        |                                                  |
-  |                        |<---------- 200 OK (completion response) ---------|
-  |                        |                                                  |
-  |                   [Parse rate limit headers from Provider B]              |
-  |                   [Update tracker: remaining=47, resets_at=...]           |
-  |                   [Emit: request:success event]                          |
-  |                   [Normalize to OpenAI format]                           |
-  |                        |                                                  |
-  |<-- 200 OK (OpenAI format response) ---|                                  |
-  |                        |                                                  |
+React UI
+  │  POST /v1/chat/completions
+  │  Authorization: Bearer <supabase_access_token>
+  ▼
+createSupabaseAuthMiddleware
+  │  calls supabase.auth.getUser(token)  [network call to Supabase Auth]
+  │  sets c.var.userId = user.id
+  ▼
+createChatRoutes handler (logic unchanged)
+  │  resolves chain from chains Map
+  │  executes waterfall through provider adapters
+  │  calls statsRepo.logRequest(userId, entry)  ← gains userId param
+  ▼
+IStatsRepository.logRequest()
+  │
+  ├─ SQLite: SQLiteStatsRepository → existing RequestLogger (unchanged behavior)
+  └─ Supabase: SupabaseStatsRepository → INSERT request_logs (user_id = userId)
+               RLS ensures user can only SELECT their own logs
 ```
 
-### Request Flow (Streaming)
+### Request Flow — Admin Operation (Upsert Provider, SaaS Mode)
 
 ```
-Client                  429chain                              Provider
-  |                        |                                      |
-  |-- POST /v1/chat/completions { stream: true } -->|             |
-  |                        |                                      |
-  |                   [Auth + Validate + Resolve chain]           |
-  |                   [Find available provider (skip exhausted)]  |
-  |                        |                                      |
-  |                        |-- POST /chat/completions stream=true->|
-  |                        |                                      |
-  |                        |<-- 200 OK text/event-stream ---------|
-  |                        |                                      |
-  |<-- 200 OK text/event-stream --|                               |
-  |                        |                                      |
-  |                        |<-- data: {"choices":[...]} ----------|
-  |<-- data: {"choices":[...]} ---|  (piped through SSE bridge)   |
-  |                        |                                      |
-  |                        |<-- data: {"choices":[...]} ----------|
-  |<-- data: {"choices":[...]} ---|                               |
-  |                        |                                      |
-  |                        |<-- data: [DONE] + usage in final ----|
-  |<-- data: [DONE] --------------|                               |
-  |                        |                                      |
-  |                   [Extract usage from final chunk]            |
-  |                   [Update rate limit tracker]                 |
-  |                   [Emit: request:success]                     |
+React UI
+  │  PUT /v1/admin/providers/:id
+  │  Authorization: Bearer <supabase_access_token>
+  │  Body: { id, type, apiKey, ... }
+  ▼
+createSupabaseAuthMiddleware → c.var.userId = user.id
+  ▼
+createAdminRoutes handler (MODIFIED: receives IAdminRepository)
+  │  validates body with Zod (unchanged)
+  │  calls adminRepo.upsertProvider(userId, providerConfig)
+  ▼
+SupabaseAdminRepository.upsertProvider()
+  │  service-role client: UPSERT providers (id, user_id, type, api_key, ...)
+  │  user_id = userId set explicitly at INSERT
+  │  RLS WITH CHECK policy prevents writing other users' records
 ```
 
-**Important streaming detail:** The response headers (including `Content-Type: text/event-stream` and status code) must be sent to the caller BEFORE the first chunk arrives from the provider. This means once streaming starts, you cannot waterfall to another provider -- the HTTP response is already committed. Therefore:
-
-**Non-streaming requests** can waterfall freely (no response sent yet).
-**Streaming requests** must validate provider availability BEFORE opening the stream. If a streaming request fails mid-stream, send an SSE error event; do not attempt to silently switch providers.
-
-However, if a streaming request gets a non-200 response (like 429) before any chunks are sent, you CAN waterfall -- the stream hasn't started yet.
-
-### State Management
+### Request Flow — Self-Hosted Mode (any operation)
 
 ```
-+------------------------------------------+
-|           In-Memory State                |
-|                                           |
-|  Rate Limit Map                          |
-|  Map<"providerId:modelId", {              |
-|    state: AVAILABLE | TRACKING | EXHAUSTED|
-|    remaining: number | null               |
-|    resetsAt: Date | null                  |
-|    cooldownUntil: Date | null             |
-|    dailyTokensUsed: number                |
-|    dailyTokenLimit: number | null         |
-|    rpm: { count: number, windowStart }    |
-|  }>                                       |
-|                                           |
-|  Active Cooldown Timers                  |
-|  Map<"providerId:modelId", NodeJS.Timer>  |
-|                                           |
-|  Usage Counters (current session)        |
-|  Map<key, { requests, tokens, errors }>   |
-+------------------------------------------+
-         |                    ^
-         | periodic flush     | load on startup
-         v                    |
-+------------------------------------------+
-|           Persistent Storage             |
-|                                           |
-|  config.yaml (or config.json)            |
-|  - providers: [{ id, name, apiKey, ... }]|
-|  - chains: [{ id, name, entries: [...] }]|
-|  - settings: { port, apiKeys, ... }      |
-|                                           |
-|  data/usage.json                         |
-|  - daily aggregates per provider/chain   |
-|  - rolling request log (last N entries)  |
-|                                           |
-|  data/ratelimits.json                    |
-|  - persisted rate limit state for        |
-|    recovery after restart                |
-+------------------------------------------+
+React UI (no AuthContext — Layout shows plain API key input)
+  │  PUT /v1/admin/providers/:id
+  │  Authorization: Bearer <api_key_from_config>
+  ▼
+createAuthMiddleware (UNCHANGED) — validates against config.settings.apiKeys
+  ▼
+createAdminRoutes handler
+  │  calls adminRepo.upsertProvider('', providerConfig)  ← userId empty string
+  ▼
+SQLiteAdminRepository.upsertProvider()
+  │  userId ignored — same behavior as today
+  │  configRef mutation + YAML write + registry.add()
 ```
 
-**Key state design decisions:**
+### Frontend Auth State Flow
 
-1. **Rate limit state is primarily in-memory.** It changes on every request. Persisting to disk on every request would be a performance bottleneck. Instead, persist periodically (every 30s or on shutdown) so state survives restarts.
+```
+App loads
+  ▼
+AuthProvider mounts
+  │  getSession() → reads localStorage (no network)
+  │  setSession(session) → userId available immediately if logged in
+  │  onAuthStateChange subscription established
+  ▼
+Router renders:
+  /login, /signup → public (no ProtectedRoute)
+  /*, /providers, /chains, /test → wrapped in ProtectedRoute
+  ▼
+ProtectedRoute
+  │  loading == true → render spinner
+  │  session == null AND loading == false → redirect to /login
+  │  session != null → render children
+  ▼
+apiFetch() in api.ts
+  │  reads session?.access_token from AuthContext (or supabase.auth.getSession())
+  │  adds Authorization: Bearer <access_token> to every request
+  │  on 401 → existing clearApiKey() call replaced with supabase.auth.signOut()
+```
 
-2. **Config is file-based but cached in memory.** The config manager loads config on startup, keeps it in memory, and writes back when changes are made via the Web UI. This avoids filesystem reads on every request.
+---
 
-3. **Usage data is append-friendly.** Request logs grow over time. Use a rolling log (keep last N entries or last N days) to prevent unbounded growth. Aggregated stats (daily totals) are separate and compact.
+## Postgres Schema
 
-## Scaling Considerations
+### Tables (Supabase mode only)
 
-| Concern | At 1-10 RPS (personal use) | At 100 RPS (team) | At 1000+ RPS (public service) |
-|---------|---------------------------|--------------------|-----------------------------|
-| **Concurrency** | Single Node process sufficient | Single process OK, may need worker threads for CPU-bound token counting | Cluster mode or multiple instances with shared state |
-| **State** | In-memory is fine | In-memory is fine | Need shared state store (Redis) across instances |
-| **Persistence** | JSON files sufficient | JSON files OK, consider SQLite for request logs | Need proper database (Postgres) |
-| **Streaming** | No concerns | Monitor open connection count | Need connection pooling, backpressure management |
-| **Rate Limit Tracking** | In-memory map | In-memory map | Shared Redis-based tracking |
+```sql
+-- All tables use auth.uid() in RLS policies.
+-- auth.uid() returns the sub claim from the Supabase JWT.
+-- (select auth.uid()) syntax caches the result per query — faster.
 
-**For v1 (personal/small team use):** Single-process, in-memory state, JSON file persistence is the right choice. Do not over-engineer. The architecture allows swapping the persistence layer later without touching core logic.
+CREATE TABLE providers (
+  id          TEXT     NOT NULL,
+  user_id     UUID     NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  type        TEXT     NOT NULL,
+  base_url    TEXT,
+  api_key     TEXT     NOT NULL,
+  rate_limits JSONB,
+  PRIMARY KEY (id, user_id)  -- same provider id can exist per multiple users
+);
+ALTER TABLE providers ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "users own their providers"
+  ON providers FOR ALL
+  USING      ((SELECT auth.uid()) = user_id)
+  WITH CHECK ((SELECT auth.uid()) = user_id);
 
-## Anti-Patterns
+CREATE TABLE chains (
+  name    TEXT NOT NULL,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  PRIMARY KEY (name, user_id)
+);
+ALTER TABLE chains ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "users own their chains"
+  ON chains FOR ALL
+  USING      ((SELECT auth.uid()) = user_id)
+  WITH CHECK ((SELECT auth.uid()) = user_id);
 
-### Anti-Pattern 1: Monolithic Request Handler
+CREATE TABLE chain_entries (
+  chain_name  TEXT    NOT NULL,
+  user_id     UUID    NOT NULL,
+  position    INTEGER NOT NULL,
+  provider_id TEXT    NOT NULL,
+  model       TEXT    NOT NULL,
+  PRIMARY KEY (chain_name, user_id, position),
+  FOREIGN KEY (chain_name, user_id) REFERENCES chains(name, user_id) ON DELETE CASCADE
+);
+ALTER TABLE chain_entries ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "users own their chain entries"
+  ON chain_entries FOR ALL
+  USING      ((SELECT auth.uid()) = user_id)
+  WITH CHECK ((SELECT auth.uid()) = user_id);
 
-**What:** Putting all logic (auth, routing, provider calls, streaming, tracking) in a single route handler function.
+CREATE TABLE request_logs (
+  id                BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  user_id           UUID    NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  timestamp         BIGINT  NOT NULL,
+  chain_name        TEXT    NOT NULL,
+  provider_id       TEXT    NOT NULL,
+  model             TEXT    NOT NULL,
+  prompt_tokens     INTEGER NOT NULL DEFAULT 0,
+  completion_tokens INTEGER NOT NULL DEFAULT 0,
+  total_tokens      INTEGER NOT NULL DEFAULT 0,
+  latency_ms        INTEGER NOT NULL,
+  http_status       INTEGER NOT NULL,
+  attempts          INTEGER NOT NULL,
+  error_message     TEXT
+);
+ALTER TABLE request_logs ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "users see their own logs"
+  ON request_logs FOR ALL
+  USING      ((SELECT auth.uid()) = user_id)
+  WITH CHECK ((SELECT auth.uid()) = user_id);
 
-**Why bad:** A 500-line route handler is impossible to test, debug, or extend. Adding a new provider means modifying the core handler.
+-- Indexes: user_id first in composite index so RLS filter is efficient
+CREATE INDEX ON request_logs (user_id, timestamp DESC);
+CREATE INDEX ON request_logs (user_id, provider_id);
+CREATE INDEX ON request_logs (user_id, chain_name);
 
-**Instead:** Layer the architecture as described above. The route handler should be ~20 lines: validate, call chain router, return response. Everything else is delegated.
+-- Note on aggregation tables:
+-- The SQLite schema uses materialized aggregation tables (usage_by_provider,
+-- usage_by_chain) maintained by INSERT triggers for O(1) stats queries.
+-- In Postgres, compute aggregates from request_logs with GROUP BY on first
+-- implementation. Materialize later (as a Postgres VIEW or separate table)
+-- only if aggregate queries become measurably slow.
+```
 
-### Anti-Pattern 2: Synchronous Rate Limit Checks Against Disk
-
-**What:** Reading rate limit state from a JSON file on every incoming request.
-
-**Why bad:** File I/O on every request adds latency and creates a bottleneck. Under concurrent requests, file reads can return stale data.
-
-**Instead:** Keep rate limit state in memory. Flush to disk periodically for crash recovery. Memory reads are effectively free.
-
-### Anti-Pattern 3: Buffering Full Streaming Responses
-
-**What:** Collecting all SSE chunks into a buffer, then sending the complete response to the caller.
-
-**Why bad:** Defeats the purpose of streaming. Users see no output until the entire response is generated (could be 10+ seconds for long completions). Also doubles memory usage.
-
-**Instead:** Pipe chunks through as they arrive. Only intercept/inspect chunks for metadata (token counts in final chunk), do not buffer them.
-
-### Anti-Pattern 4: Hard-Coding Provider Logic
-
-**What:** Having `if (provider === 'openrouter') { ... } else if (provider === 'groq') { ... }` throughout the codebase.
-
-**Why bad:** Adding a new provider requires changes in multiple files. Easy to miss one branch and introduce bugs.
-
-**Instead:** Provider adapter pattern. Each provider is a class implementing a common interface. The core system works with the interface, never with concrete providers directly. New providers are added by implementing the interface.
-
-### Anti-Pattern 5: Tight Coupling Between Proxy and Dashboard
-
-**What:** Building the Web UI backend and the proxy API as intertwined route handlers sharing state via module globals.
-
-**Why bad:** Makes it impossible to test the proxy without the UI, or vice versa. State management becomes a tangled mess.
-
-**Instead:** The proxy (API layer + core) and the dashboard (admin API + frontend) share state only through well-defined interfaces: the config manager, the rate limit tracker, and the usage collector. They are separate route modules mounted on the same HTTP server.
-
-### Anti-Pattern 6: Retry Loops Without Circuit Breaking
-
-**What:** On every 429, immediately retry with the same provider after a delay.
-
-**Why bad:** If a provider is rate-limited for 60 seconds, retrying every second wastes 60 requests. Multiply by concurrent callers and you're DDoS-ing the provider.
-
-**Instead:** Mark as EXHAUSTED with a cooldown. Skip it entirely until the cooldown expires. This is what the rate limit state machine provides.
+---
 
 ## Integration Points
 
-### External Services (AI Providers)
+### New vs Existing Components at Each Layer
 
-| Provider | Base URL | Auth Pattern | Rate Limit Headers | Notes |
-|----------|----------|-------------|-------------------|-------|
-| OpenRouter | `https://openrouter.ai/api/v1` | Bearer token + HTTP-Referer | `x-ratelimit-remaining`, `x-ratelimit-limit`, `x-ratelimit-reset` | Many free models, popular aggregator |
-| Groq | `https://api.groq.com/openai/v1` | Bearer token | `x-ratelimit-remaining-requests`, `x-ratelimit-remaining-tokens`, `retry-after` | Very fast inference, strict rate limits |
-| Cerebras | `https://api.cerebras.ai/v1` | Bearer token | Standard x-ratelimit headers | Fast inference, free tier |
-| Generic OpenAI-compatible | Configurable | Bearer token | Variable | Catch-all for any provider using OpenAI API format |
+| Layer | Unchanged | Modified | New |
+|-------|-----------|----------|-----|
+| **Bootstrap** | config loading, registry, chains, tracker, queue, SSE | `index.ts`: mode detection, repo factory, auth middleware selection | — |
+| **Auth middleware** | `createAuthMiddleware` (self-hosted) | — | `createSupabaseAuthMiddleware` (SaaS) |
+| **Route factories** | chat, models, health, ratelimits, test | `createAdminRoutes` (receives IAdminRepository), `createStatsRoutes` (receives IStatsRepository) | — |
+| **Persistence interfaces** | db, schema, request-logger, aggregator | — | `IAdminRepository`, `IStatsRepository`, factory |
+| **SQLite repos** | db, schema, request-logger, aggregator | — | `SQLiteAdminRepository`, `SQLiteStatsRepository` |
+| **Supabase repos** | — | — | `SupabaseAdminRepository`, `SupabaseStatsRepository`, `client.ts`, `migrations.sql` |
+| **Frontend** | Dashboard, Providers, Chains, Test pages; TanStack Query setup | `api.ts` (JWT Bearer), `Layout.tsx` (auth UI), `main.tsx` (new routes + AuthProvider) | `supabase.ts`, `AuthContext.tsx`, `Login.tsx`, `Signup.tsx`, `ProtectedRoute.tsx` |
 
-**Provider integration contract:**
-- All providers are accessed via HTTP POST to a `/chat/completions` endpoint
-- All use `Authorization: Bearer <key>` (with minor variations)
-- Response format should be OpenAI-compatible (though some providers add extra fields)
-- SSE format follows OpenAI's `data: {json}\n\n` pattern
-- Rate limit headers are provider-specific and need per-provider parsing
+### External Services
+
+| Service | Integration Pattern | Notes |
+|---------|---------------------|-------|
+| Supabase Auth | `@supabase/supabase-js` — `signInWithPassword` / `signUp` on frontend; `getUser(token)` on server per-request | `getUser()` makes one network call per API request. Switch to `getClaims()` if project uses asymmetric signing keys for local (no-network) verification. |
+| Supabase Postgres | `@supabase/supabase-js` service-role client for server writes; user JWT client for RLS-enforced queries | Service-role key is server-only (non-VITE env var, never in frontend bundle). |
 
 ### Internal Boundaries
 
-```
-                    Config Manager
-                    /     |      \
-                   /      |       \
-            Chain Router  |   Rate Limit Tracker
-                |         |         |
-                |    Usage Collector |
-                |         |         |
-            Provider -----+---------+
-            Adapters
-                |
-            SSE Bridge
-```
+| Boundary | Communication | Notes |
+|----------|---------------|-------|
+| `index.ts` → auth middleware | Mode check at startup; mounts either `createAuthMiddleware` or `createSupabaseAuthMiddleware` on the `v1` sub-app | `MODE=saas` env var is the toggle. Can also infer from `SUPABASE_URL` presence. |
+| Route handlers → repositories | Dependency injection via factory function params | `adminRepo.upsertProvider(userId, data)` — same call regardless of backend. |
+| Hono auth middleware → route handlers | `c.var.userId` typed context variable | Handlers call `const userId = c.var.userId ?? ''`. SQLite repos ignore empty string. |
+| `createAdminRoutes` → `IAdminRepository` | Direct async method calls | `configRef`, `configPath`, `registry`, `chains` move into `SQLiteAdminRepository` constructor — route factory no longer holds these. |
+| React `AuthContext` → `api.ts` | `session.access_token` injected as Bearer token | `apiFetch` reads from `supabase.auth.getSession()` or a shared auth context ref. 401 handling redirects to `/login` instead of clearing a simple key. |
 
-**Boundary rules:**
+---
 
-1. **Chain Router -> Provider Adapters:** Router calls adapters through the registry interface. Router never imports a specific adapter.
+## Suggested Build Order
 
-2. **Chain Router -> Rate Limit Tracker:** Router queries tracker to check availability. Tracker never initiates requests.
-
-3. **Provider Adapters -> Rate Limit Tracker:** Adapters parse headers and send updates to tracker. Tracker does not know about HTTP.
-
-4. **Usage Collector -> Everything:** Collector listens to events. Nothing depends on the collector. It can be disabled without affecting functionality.
-
-5. **Config Manager -> Everything:** Config is injected at startup. Components read config, they do not own it.
-
-6. **Web UI Backend -> Core Components:** The admin API reads from Config Manager, Rate Limit Tracker, and Usage Collector. It writes to Config Manager only. It never directly interacts with Provider Adapters.
-
-### Build Order Dependencies
-
-Understanding what depends on what is critical for phasing the build:
+Dependencies flow upward. Each step is independently testable before the next starts.
 
 ```
-Level 0 (no dependencies):
-  - shared/types.ts
-  - shared/errors.ts
-  - shared/logger.ts
-  - shared/events.ts
-  - config/schema.ts
-  - config/types.ts
+Step 1: Repository interfaces + SQLite wrapper classes
+  Define IAdminRepository and IStatsRepository in types.ts
+  Write SQLiteAdminRepository (extract logic from createAdminRoutes body)
+  Write SQLiteStatsRepository (wrap existing RequestLogger + Aggregator)
+  Wire into repositoryFactory with mode='sqlite'
+  Verify: existing self-hosted behavior unchanged end-to-end
+  RATIONALE: No auth needed. Testable with hardcoded userId=''. Unblocks all
+             downstream steps since the interface is now defined.
 
-Level 1 (depends on Level 0):
-  - config/manager.ts (depends on types, schema)
-  - persistence/store.ts (depends on types)
-  - providers/base-adapter.ts (depends on types, errors)
-  - providers/rate-limit/types.ts (depends on shared types)
+Step 2: Postgres schema
+  Write migrations.sql with all tables and RLS policies
+  Apply to Supabase project
+  Manually verify: two test users cannot read each other's rows
+  RATIONALE: Schema must exist before Supabase repository classes can be written.
 
-Level 2 (depends on Level 1):
-  - providers/rate-limit/tracker.ts (depends on rate-limit types, events)
-  - providers/rate-limit/header-parser.ts (depends on rate-limit types)
-  - providers/rate-limit/cooldown.ts (depends on tracker, events)
-  - providers/adapters/generic-openai.ts (depends on base-adapter)
-  - streaming/sse-parser.ts (depends on types)
-  - streaming/sse-writer.ts (depends on types)
+Step 3: Supabase repository classes
+  Write supabase/client.ts (service-role singleton + user client factory)
+  Write SupabaseAdminRepository
+  Write SupabaseStatsRepository
+  Wire into repositoryFactory with mode='supabase'
+  Verify: CRUD operations work for a test userId with direct client calls
+  RATIONALE: Pure server logic, no Hono or React involved. Testable in isolation.
 
-Level 3 (depends on Level 2):
-  - providers/registry.ts (depends on adapters, config)
-  - streaming/sse-bridge.ts (depends on parser, writer)
-  - tracking/usage-collector.ts (depends on events, types)
+Step 4: Hono Supabase auth middleware
+  Write createSupabaseAuthMiddleware
+  Wire into index.ts under MODE=saas gate (else use existing createAuthMiddleware)
+  Thread c.var.userId into admin and stats route calls
+  Verify: valid JWT passes middleware, invalid JWT returns 401
+  RATIONALE: Blocked on Step 3 (needs userId to pass to repos). Steps 2-3 must be done.
 
-Level 4 (depends on Level 3):
-  - core/chain-router.ts (depends on registry, tracker, sse-bridge, events)
-  - core/request-context.ts (depends on types)
-  - core/response-builder.ts (depends on types)
+Step 5: Route factory updates
+  Update createAdminRoutes to accept IAdminRepository, remove configRef/registry/chains params
+  Update createStatsRoutes to accept IStatsRepository, remove aggregator param
+  Update createChatRoutes to pass userId into stats logging
+  Verify: self-hosted mode still works (sqlite repos, userId ignored)
+  VERIFY: SaaS mode end-to-end: add provider, list it, delete it via API
+  RATIONALE: Blocked on Steps 1 (interfaces) and 4 (userId in context).
 
-Level 5 (depends on Level 4):
-  - api/middleware/* (depends on config, types)
-  - api/routes/chat.ts (depends on chain-router, response-builder)
-  - api/routes/models.ts (depends on config, registry)
+Step 6: Frontend auth
+  Add ui/src/lib/supabase.ts client singleton
+  Add AuthContext.tsx with onAuthStateChange
+  Add Login.tsx and Signup.tsx pages
+  Add ProtectedRoute.tsx
+  Update main.tsx: AuthProvider wrapper, /login + /signup in router, ProtectedRoute on app routes
+  Update Layout.tsx: replace API key input with auth status display + logout button
+  Update api.ts: read session.access_token instead of sessionStorage API key
+  Verify: sign up → redirect to dashboard; logout → redirect to /login
+  RATIONALE: Blocked on Steps 4-5 (needs a working authenticated API to call).
 
-Level 6 (depends on Level 5):
-  - api/admin/* (depends on config, tracker, usage-collector)
-  - server.ts (depends on all routes)
-
-Level 7 (depends on Level 6):
-  - Web UI frontend (depends on admin API being stable)
+Step 7: End-to-end integration
+  Self-hosted smoke test: all existing routes still work with API key auth
+  SaaS smoke test: sign up two users, add providers/chains as each user
+  Verify: User A cannot see or modify User B's data
+  Verify: chat completions log to correct user's request_logs row
 ```
 
-**Implied phase ordering for roadmap:**
-1. **Foundation:** Types, config schema, error classes, logger, event bus
-2. **Provider Layer:** Base adapter, generic OpenAI adapter, header parser
-3. **Core Engine:** Rate limit tracker, cooldown, chain router (non-streaming)
-4. **Proxy Endpoint:** HTTP server, auth middleware, chat/completions route (non-streaming)
-5. **Streaming:** SSE parser, writer, bridge, streaming support in chain router
-6. **Tracking:** Usage collector, request logging, stats aggregation
-7. **Admin API:** CRUD for providers/chains, stats endpoints
-8. **Web UI:** Frontend dashboard consuming admin API
-9. **Polish:** Docker, CLI packaging, config file format, documentation
+**Why this order:**
+- Steps 1-3 are pure backend with no auth dependency — all testable with hardcoded strings
+- Step 4 (auth middleware) only makes sense once repos exist (Step 1) to receive the userId
+- Step 5 (route wiring) needs both interfaces (Step 1) and the userId source (Step 4)
+- Step 6 (frontend) is unblockable until the server API authenticates correctly (Steps 4-5)
+- Self-hosted mode never breaks because SQLite repos exactly reproduce today's behavior
 
-## Key Architectural Decisions Summary
+---
 
-| Decision | Recommendation | Rationale |
-|----------|---------------|-----------|
-| HTTP Framework | **Fastify** over Express | Better TypeScript support, built-in validation, better streaming performance, plugin architecture. Express is also fine but Fastify is the more modern choice. |
-| Config Format | **YAML** with JSON schema validation | More human-readable than JSON for config files. Validate with Zod at load time. |
-| State Management | **In-memory with periodic flush** | Rate limits change constantly. Disk I/O per request is a non-starter. Flush every 30s for crash recovery. |
-| Provider Adapters | **Class-based with interface** | Clean adapter pattern. Easy to add providers. Generic OpenAI adapter covers most cases. |
-| Event Bus | **Node.js EventEmitter (typed)** | Simple, zero dependencies, fast. No need for Redis pub/sub at this scale. |
-| Streaming | **Native Node.js streams (pipe through)** | Do not buffer. Transform streams for interception (token counting). |
-| Persistence | **JSON files for v1** | Simplest option that works. No database setup required. SQLite upgrade path exists. |
-| Web UI | **Separate SPA (React or Preact)** | Clean API boundary. Could be replaced or augmented. Served as static files by the same server. |
-| Validation | **Zod** | Runtime type validation, TypeScript inference, excellent DX. Used for config validation and request validation. |
-| Testing | **Vitest** | Fast, TypeScript-native, good mocking support. Test each layer independently. |
+## Anti-Patterns
+
+### Anti-Pattern 1: Sending the Service-Role Key to the Frontend
+
+**What people do:** Set `VITE_SUPABASE_SERVICE_ROLE_KEY` so the React app can make direct Supabase queries.
+
+**Why it's wrong:** `VITE_` env vars are embedded in the JavaScript bundle. Anyone who downloads the app can extract the service-role key. That key bypasses all RLS policies — full unrestricted database access.
+
+**Do this instead:** The service-role key lives only in server environment variables (no `VITE_` prefix). The frontend only uses `VITE_SUPABASE_ANON_KEY`, which is safe to expose — RLS is enforced for every query made with it.
+
+### Anti-Pattern 2: Using getSession() for Server-Side Authorization
+
+**What people do:** On the Hono server, call `supabase.auth.getSession()` and trust the returned userId.
+
+**Why it's wrong:** `getSession()` reads from a cookie or localStorage without verifying with the Auth server. A tampered or revoked token still returns data.
+
+**Do this instead:** On the server, always call `supabase.auth.getUser(token)`. This makes a network request to Supabase Auth to verify the JWT is still valid and not revoked. On the frontend, `getSession()` is fine for rendering UI state.
+
+### Anti-Pattern 3: Keeping In-Memory Registry and Chains as the Source of Truth in SaaS Mode
+
+**What people do:** Reuse the startup-loaded `registry` (Map) and `chains` (Map) for SaaS mode, thinking they just need to add userId-scoping.
+
+**Why it's wrong:** In self-hosted mode these Maps are loaded once from config at startup — they represent one user's data. In SaaS mode, each user has different providers and chains. A single in-memory Map cannot serve multiple tenants without loading all users' data into it, which scales poorly and leaks data across tenants.
+
+**Do this instead:** In SaaS mode, the chat route must load the requesting user's providers and chains from Postgres on each request (or with a short TTL per-user cache). This is a significant architectural change to `createChatRoutes` that warrants its own implementation plan. Flag this as the primary complexity of the SaaS chat path.
+
+### Anti-Pattern 4: Making SQLite Repository Methods Truly Async
+
+**What people do:** Rewrite SQLiteAdminRepository using `async/await` around `better-sqlite3` calls because the interface is async.
+
+**Why it's wrong:** `better-sqlite3` is synchronous by design — it blocks the Node.js thread but avoids callback overhead for fast local queries. Wrapping in unnecessary async does nothing except add microtask scheduling.
+
+**Do this instead:** Return `Promise.resolve(result)` in SQLite implementations. The interface is async because the Supabase implementation is genuinely async. SQLite satisfies the contract by resolving immediately without doing async work.
+
+### Anti-Pattern 5: Writing Separate RLS Policies for SELECT/INSERT/UPDATE/DELETE When FOR ALL Works
+
+**What people do:** Write four separate CREATE POLICY statements per table (one per operation) for simple user-ownership scenarios.
+
+**Why it's wrong:** Not wrong per se, but unnecessary verbosity for the simple `user_id = auth.uid()` pattern. It creates more policies to maintain.
+
+**Do this instead:** Use `FOR ALL` with both `USING` (governs SELECT/UPDATE/DELETE row visibility) and `WITH CHECK` (governs INSERT/UPDATE row constraints) in a single policy. For this application's simple ownership model, `FOR ALL` is correct and concise.
+
+---
+
+## Scaling Considerations
+
+| Scale | Architecture Notes |
+|-------|-------------------|
+| 0-500 users | Single Hono process, Supabase free tier, `getUser()` auth on every request is fine |
+| 500-5k users | Switch to `getClaims()` if project uses asymmetric signing keys — eliminates auth network hop. Add Supabase connection pooler (built into Supabase dashboard). |
+| 5k+ users | Per-user in-memory registry/chain cache with short TTL (see Anti-Pattern 3 above). Materialized aggregation tables in Postgres replace on-demand GROUP BY queries. |
+
+**First bottleneck:** `getUser()` adds one network round-trip per API call to the Supabase Auth server. Switch to asymmetric signing + `getClaims()` early if latency is a concern — no code change needed beyond the middleware internals.
+
+**Second bottleneck:** Loading providers and chains from Postgres per chat request in SaaS mode (no startup-loaded Maps). Address with a per-userId LRU cache with a 60-second TTL inside the chat route in SaaS mode.
+
+---
 
 ## Sources
 
-- Architecture patterns drawn from analysis of LiteLLM proxy (Python-based AI gateway with provider abstraction and fallback routing), Portkey AI Gateway (TypeScript-based gateway with similar adapter patterns), and general API gateway design patterns.
-- OpenAI API specification for endpoint shapes, SSE format, and response structures.
-- Rate limiting patterns from API gateway literature (circuit breaker, token bucket, sliding window).
-- Node.js streaming best practices from Node.js documentation (Transform streams, backpressure handling).
-- **Confidence note:** All sources are from training knowledge (cutoff May 2025). WebSearch and WebFetch were unavailable during this research session. Specific version numbers and current API details should be verified before implementation.
+- [Use Supabase with Hono | Supabase Docs](https://supabase.com/docs/guides/getting-started/quickstarts/hono)
+- [Row Level Security | Supabase Docs](https://supabase.com/docs/guides/database/postgres/row-level-security)
+- [JSON Web Token (JWT) | Supabase Docs](https://supabase.com/docs/guides/auth/jwts)
+- [auth.getClaims() | Supabase JS Reference](https://supabase.com/docs/reference/javascript/auth-getclaims)
+- [Password-based Auth | Supabase Docs](https://supabase.com/docs/guides/auth/passwords)
+- [Use Supabase Auth with React | Supabase Docs](https://supabase.com/docs/guides/auth/quickstarts/react)
+- [Hono Context API | Hono Docs](https://hono.dev/docs/api/context)
+- [Type safety for middleware context variables | Hono Discussion #3257](https://github.com/orgs/honojs/discussions/3257)
+- [Multi-Tenant Applications with RLS on Supabase | AntStack](https://www.antstack.com/blog/multi-tenant-applications-with-rls-on-supabase-postgress/)
 
 ---
-*Architecture research for: AI inference proxy/aggregator (429chain)*
-*Researched: 2026-02-05*
-*Tools available: Glob, Read, Write, Bash (limited). WebSearch/WebFetch unavailable.*
+*Architecture research for: 429chain v1.1 SaaS multi-tenant integration*
+*Researched: 2026-03-01*

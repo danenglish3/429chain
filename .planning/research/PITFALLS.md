@@ -455,3 +455,356 @@ When things go wrong, how to recover.
 ---
 *Pitfalls research for: AI inference proxy/aggregator (429chain)*
 *Researched: 2026-02-05*
+
+---
+---
+
+# v1.1 SaaS Multi-Tenancy Pitfalls
+
+**Domain:** Adding Supabase Auth + Postgres RLS multi-tenancy to existing single-user Node.js proxy app
+**Researched:** 2026-03-01
+**Confidence:** HIGH (critical and security pitfalls verified against official Supabase docs, Bytebase RLS footguns article, pgbouncer docs, and AWS multi-tenant RLS guide)
+
+These pitfalls are specific to the v1.1 milestone: retrofitting multi-tenant SaaS onto the existing single-user 429chain codebase.
+
+---
+
+## Critical Pitfalls (SaaS Milestone)
+
+---
+
+### SaaS Pitfall 1: Self-Hosted Mode Broken by Unconditional Supabase Imports
+
+**What goes wrong:**
+Adding `import { createClient } from '@supabase/supabase-js'` in any module that self-hosted mode also loads causes self-hosted deployments to either fail to start (missing env vars crash on initialization) or silently attempt Supabase connections and throw at runtime. The existing self-hosted mode has zero Supabase dependency — any unconditional Supabase import in a shared module breaks that guarantee. In TypeScript ESM, top-level `import` statements are evaluated eagerly, so there is no lazy fallback.
+
+**Why it happens:**
+Development happens in SaaS mode. Supabase imports naturally migrate into shared modules (middleware, route files, DB utilities) over time as the developer adds features without switching to test self-hosted mode. The self-hosted path is not re-tested until deployment.
+
+**How to avoid:**
+All Supabase-specific code must live exclusively in modules inside a `db/supabase/` (or equivalent) directory that is only imported when `DEPLOYMENT_MODE=saas`. Use dynamic `import()` — lazy imports — for Supabase modules at the factory/entry-point level. The DB abstraction factory (`createRepository()`) is the single conditional branch point. Self-hosted mode must never reach any code that imports from `@supabase/supabase-js`. Add a CI matrix job that runs the full test suite with `DEPLOYMENT_MODE=self-hosted` and no Supabase env vars defined.
+
+**Warning signs:**
+- `grep -r "@supabase/supabase-js" src/` returns hits outside `db/supabase/` or `saas/` modules
+- No CI matrix entry for `DEPLOYMENT_MODE=self-hosted`
+- Self-hosted Docker tests were last run before any SaaS code was written
+
+**Phase to address:**
+Very first phase — dual-mode architecture. The conditional import structure must be established before any SaaS code is written. This is a foundational decision, not a retrofit.
+
+---
+
+### SaaS Pitfall 2: Global service_role Supabase Client Bypasses RLS on All Paths
+
+**What goes wrong:**
+The `service_role` key bypasses all RLS policies in Postgres. If any server-side code path uses a `service_role` Supabase client where a user-scoped client should be used, that path reads and writes data across all tenants without restriction. The bug is invisible — it works correctly. It is only discovered when a cross-tenant data leak is reported. For 429chain, any route handler that touches providers, chains, usage logs, or API keys using a service_role client silently serves data from every tenant.
+
+**Why it happens:**
+It is easier to initialize one global `service_role` client for convenience during development. The problem is masked because tests only assert that user A can see user A's data — they do not assert that user A cannot see user B's data.
+
+**How to avoid:**
+Establish a hard structural rule: the `service_role` client is only initialized in explicitly named admin functions (e.g., `createUserOnSignup()`). All request-scoped operations use a per-request client initialized with the user's JWT, constructed inside Hono middleware and injected into the request context via `c.set('db', client)`. The per-request client must never be a module-level singleton. Write a cross-tenant isolation test: create user A and user B, insert providers for user A, query as user B, assert zero rows returned.
+
+**Warning signs:**
+- A module-level `const supabase = createClient(..., SUPABASE_SERVICE_ROLE_KEY)` accessible from route handlers
+- No test that asserts user A cannot read user B's providers, chains, or API keys
+- All Supabase client initialization in the codebase uses `SUPABASE_SERVICE_ROLE_KEY`
+
+**Phase to address:**
+Early architectural — Supabase client initialization pattern must be decided and enforced before any routes are written for SaaS mode.
+
+---
+
+### SaaS Pitfall 3: auth.uid() Returns NULL Silently — No Unauthenticated Guard
+
+**What goes wrong:**
+When a server-side request reaches Postgres without a valid JWT in the session context, `auth.uid()` returns `NULL`. A policy like `USING (auth.uid() = user_id)` evaluates as `NULL = user_id`, which is always false in SQL — so the query silently returns zero rows instead of throwing an error. Server-side code paths (background queue workers, scheduled tasks, admin routes) that skip JWT injection return empty datasets rather than visible errors. The bug is invisible until a developer or user notices missing data.
+
+**Why it happens:**
+Developers always test while authenticated. `auth.uid()` has a valid value in every test scenario. Unauthenticated server-side paths are never tested and the "empty result" failure mode looks like a data issue, not an auth issue.
+
+**How to avoid:**
+Add `TO authenticated` to every RLS policy so that it never evaluates for the `anon` role at all. Also add explicit null guards: `USING (auth.uid() IS NOT NULL AND auth.uid() = user_id)`. Write at least one test per protected endpoint that makes an unauthenticated request and asserts a 401/403 response at the application layer — before the DB query runs at all.
+
+**Warning signs:**
+- RLS policies that don't specify a `TO` role clause
+- Integration tests that only test authenticated paths
+- A protected API endpoint returns `[]` (empty array) rather than `401` when called without a token
+- Queue processors or background jobs that make DB queries without constructing a JWT context
+
+**Phase to address:**
+DB schema and RLS design — early. Set the `TO authenticated` requirement and null guards in every policy during schema creation.
+
+---
+
+### SaaS Pitfall 4: USING Without WITH CHECK Allows Cross-Tenant Data Injection
+
+**What goes wrong:**
+A RLS policy with only a `USING` clause filters what rows a user can read and which rows are affected by UPDATE/DELETE. For INSERT, `USING` has no effect — only `WITH CHECK` controls what values can be written. Without `WITH CHECK`, a user can INSERT a row with another tenant's `user_id`, injecting data into a tenant's namespace they do not own. The attacker cannot read that data (the read policy blocks it), but it corrupts the other tenant's dataset silently.
+
+**Why it happens:**
+The most common RLS tutorial shows `USING (auth.uid() = user_id)` and stops there. The `WITH CHECK` clause is underexplained. The distinction between read-side and write-side enforcement is non-obvious because they feel like the same thing.
+
+**How to avoid:**
+Every table policy that permits INSERT or UPDATE must include `WITH CHECK (auth.uid() = user_id)`. The canonical pattern for a per-tenant table:
+
+```sql
+CREATE POLICY "tenant_isolation" ON providers
+  FOR ALL
+  TO authenticated
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+```
+
+Run Supabase's Security Advisor in the dashboard after every schema change. Write a test that attempts to INSERT a row with a `user_id` set to a different user's UUID and asserts the operation is rejected with an RLS error.
+
+**Warning signs:**
+- RLS policies using `FOR ALL` with only a `USING` clause and no `WITH CHECK`
+- Supabase Security Advisor has not been run against the schema
+- No insert test that attempts cross-tenant user_id injection
+
+**Phase to address:**
+Schema creation — very early. `WITH CHECK` must be present from the first migration, not added as a security retrofit.
+
+---
+
+### SaaS Pitfall 5: Pgbouncer/Supavisor Transaction Mode Causes Session Variable Leakage Between Tenants
+
+**What goes wrong:**
+Supabase uses Supavisor in transaction pooling mode by default. In transaction pooling, a `SET` (session-level) command persists on a pooled connection after the transaction ends and the connection is returned to the pool. If request A sets `request.jwt.claims` to tenant A's JWT via `SET`, then the connection is returned to the pool, and request B from tenant B gets that same physical connection — `auth.uid()` now returns tenant A's user ID for tenant B's query. This is a silent cross-tenant data leak that only occurs under concurrent load in production.
+
+**Why it happens:**
+Local development uses a direct connection (no pooler) where session variables are connection-scoped and safe. The bug is invisible in local or low-traffic testing. It surfaces only under production load or staging with Supavisor.
+
+**How to avoid:**
+Always use `SET LOCAL` (not `SET`) to scope variables to the current transaction. `SET LOCAL` automatically reverts when the transaction ends, making it safe with connection poolers. When using the Supabase JS SDK with `.auth.setSession()`, PostgREST handles this correctly. When using a direct Postgres driver, every tenant-scoped DB call must be wrapped in an explicit transaction that uses `SET LOCAL`:
+
+```sql
+BEGIN;
+SELECT set_config('request.jwt.claims', $1, true); -- third arg true = SET LOCAL
+-- your query
+COMMIT;
+```
+
+Add a concurrent-request integration test that fires requests from two different users simultaneously and asserts neither sees the other's data.
+
+**Warning signs:**
+- Direct Postgres driver usage alongside Supabase with `SET` (not `SET LOCAL`) for JWT claims
+- Tests run against a direct connection only, not against Supavisor
+- No concurrent cross-tenant test in the integration suite
+
+**Phase to address:**
+Early architectural — DB abstraction layer design. Establish `SET LOCAL` as the mandatory pattern before any repository implementations are written.
+
+---
+
+### SaaS Pitfall 6: SSE Streaming Connections Carry an Expiring JWT — Mishandled Mid-Stream
+
+**What goes wrong:**
+429chain's existing SSE streaming already works for proxying AI responses. In SaaS mode, the incoming request's JWT (default 1-hour expiry in Supabase) may expire during a long-running AI call. Two failure modes exist: (1) If the JWT is re-validated on each streamed chunk, a long stream is interrupted mid-response with a 401, corrupting the client's output. (2) If DB writes that happen mid-stream (token logging, usage tracking) re-initialize a Supabase client per chunk, each write hits the Supabase Auth API with a network round-trip, adding 50-200ms of latency per chunk.
+
+**Why it happens:**
+Standard HTTP auth middleware validates once at request entry. Developers assume this pattern extends to streaming. Supabase's `getUser()` (which makes a network call) gets placed inside the streaming loop because it is the "safe" way to validate freshness, without realizing it fires on every chunk.
+
+**How to avoid:**
+Validate the JWT exactly once at stream connection establishment (in the Hono middleware before the stream starts). Store the validated `userId` in the request context closure for the duration of the stream. All mid-stream DB writes use this stored `userId` directly — they do not re-validate or re-construct a Supabase client. Use `getClaims()` (local signature validation, no network call) for the initial check; `getUser()` (network call) is only needed for session-sensitive operations at connection start. The 1-hour JWT window is sufficient for any single AI response stream.
+
+**Warning signs:**
+- `supabase.auth.getUser()` called inside the SSE streaming loop or per-chunk DB write path
+- A new Supabase client initialized per streamed chunk
+- No test for a streaming request that writes to the DB mid-stream (token logging)
+
+**Phase to address:**
+Auth + streaming integration phase. Must be explicitly designed when wiring Supabase auth into the existing Hono SSE proxy handler — not added as an afterthought.
+
+---
+
+### SaaS Pitfall 7: DB Abstraction Interface Leaks Postgres-Specific Behavior
+
+**What goes wrong:**
+The dual-mode repository abstraction defines an interface. The Postgres/Supabase implementation adds return shapes, error types, or behaviors that only exist in Postgres (e.g., `upsert` with `onConflict`, `RETURNING *` semantics, Supabase-specific `PostgrestError` codes). Business logic or route handlers begin depending on these behaviors. The SQLite implementation cannot match them exactly, so self-hosted mode returns different data shapes or throws different errors — breaking the self-hosted path silently.
+
+**Why it happens:**
+The SaaS implementation is developed first and more heavily exercised. Postgres capabilities leak upward into service layer code that calls the repository. The abstraction boundary erodes without anyone noticing because only one implementation is tested at a time.
+
+**How to avoid:**
+Define the repository interface first, independently of both backends. Any operation the interface cannot express equivalently in both SQLite and Postgres must either be excluded from the interface or abstracted into a DB-agnostic operation. Run the full test suite against both implementations in CI — a separate CI matrix job per database backend. Any test that passes Postgres but fails SQLite is an abstraction leak.
+
+**Warning signs:**
+- Repository interface methods have Supabase-specific return types (`PostgrestResponse<T>`, `PostgrestError`)
+- Service layer code catches `PostgrestError` directly
+- Tests only run against one DB implementation
+- Self-hosted integration test suite is skipped or broken after SaaS work begins
+
+**Phase to address:**
+Dual-mode architecture — the very first phase. Interface design must precede both implementations.
+
+---
+
+### SaaS Pitfall 8: BYOK Provider API Keys Stored as Plaintext
+
+**What goes wrong:**
+Each tenant stores their own provider API keys (OpenRouter, Groq, Cerebras). Stored as plaintext in the `providers` table, a single RLS misconfiguration — wrong policy, accidental service_role exposure, a SECURITY DEFINER view, or a future bug — exposes all tenants' provider credentials in one incident. Provider API keys often have billing implications and high-value rate limits attached to them.
+
+**Why it happens:**
+RLS is the security layer and feels sufficient. Application-layer encryption adds complexity for an MVP. The risk is underestimated because "RLS should protect it." Defense in depth is considered over-engineering.
+
+**How to avoid:**
+Encrypt provider API keys at the application layer before writing to Postgres. The plaintext key never leaves the server process. Decryption happens only in the request context when a provider key is needed. Options in order of implementation simplicity: (1) Supabase Vault (built-in secret manager, keys stored outside the database), (2) AES-256-GCM encryption in the repository layer using a server-side `ENCRYPTION_KEY` env var. Even if RLS is misconfigured or the database is compromised, leaked values are ciphertext.
+
+**Warning signs:**
+- Provider API keys readable as plaintext from the Supabase dashboard table editor
+- The `api_key` column is type `text` with no application-layer transformation
+- No encryption/decryption step in the provider save and fetch code paths
+
+**Phase to address:**
+Schema design — early. Encryption strategy must be decided at schema creation, not retrofitted after keys are already stored.
+
+---
+
+### SaaS Pitfall 9: Unique Constraints Without Tenant Scoping Leak Data Existence
+
+**What goes wrong:**
+A global unique index on a column like `name` or `slug` leaks data existence across tenants. When user B attempts to create a provider named "my-groq" and user A already has one with that name, the INSERT fails with a "duplicate key" constraint violation — revealing to user B that a record with that name exists somewhere in the system, even though RLS prevents user B from reading user A's data.
+
+**Why it happens:**
+Uniqueness constraints are added for correctness without considering tenant scoping. The developer tests in isolation (one user, no cross-tenant conflicts) and the leakage is not discovered until a security review.
+
+**How to avoid:**
+Scope all uniqueness constraints to include `user_id`: `UNIQUE (user_id, name)` not `UNIQUE (name)`. This permits two different tenants to have a provider with the same name, which is the correct behavior for a multi-tenant system.
+
+**Warning signs:**
+- Unique constraints on user-created entity names that do not include `user_id` as a component
+- No test that creates the same named resource as two different users and verifies both succeed
+
+**Phase to address:**
+Schema design — during migration creation. Review every `UNIQUE` constraint for tenant scope before applying.
+
+---
+
+## SaaS Technical Debt Patterns
+
+| Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
+|----------|-------------------|----------------|-----------------|
+| Global `service_role` Supabase client | Simple initialization, works everywhere | Bypasses RLS for all tenants on every code path that uses it | Never — always scope to request context |
+| Skip `WITH CHECK` in RLS policies | Simpler policies, tutorials omit it | Cross-tenant data injection possible on INSERT | Never |
+| `SET` instead of `SET LOCAL` for JWT claims | Slightly less boilerplate | Session variables leak across pooled connections under concurrent load | Never when using Supavisor/PgBouncer |
+| Test only against Postgres in CI | Easier test setup | SQLite self-hosted mode breaks silently as abstraction leaks | Never — self-hosted is a supported deployment mode |
+| Plaintext provider API key storage | No extra crypto code | Single RLS bug exposes all tenants' third-party API credentials | Local dev only; never in SaaS production |
+| Supabase imports in shared modules | Convenient access | Self-hosted mode fails to start with missing env vars | Never — isolate to mode-specific modules via dynamic import |
+| `getUser()` (network call) in every request | Always-fresh session validation | 50-200ms added latency per request from Supabase Auth network round-trip | Only for explicitly session-sensitive operations, not proxy hot path |
+
+---
+
+## SaaS Integration Gotchas
+
+| Integration | Common Mistake | Correct Approach |
+|-------------|----------------|------------------|
+| Supabase Auth + Hono middleware | Calling `supabase.auth.getUser()` (network call) on every request | Use `getClaims()` for local JWT signature validation; only call `getUser()` when session freshness is required |
+| Supabase JS SDK + server-side | Using `getSession()` server-side (trusts client-provided unverified session data) | Use `getClaims()` or `getUser()` server-side; `getSession()` is designed for client-side |
+| Supabase RLS + Supavisor | Using `SET` (session-level) for JWT claims context when using a direct driver | Use `SET LOCAL` inside an explicit transaction for all tenant context variables |
+| Supabase Auth + SSE streaming | Re-validating JWT or calling `getUser()` inside the streaming loop | Validate JWT once at stream start, store `userId` in closure, use it for all mid-stream DB writes |
+| Supabase anon key vs service_role | Using `service_role` client in route handlers, or `anon` key with no RLS | `anon` key + RLS for user-facing requests; `service_role` only in explicit admin code paths |
+| SECURITY DEFINER views | Views created with raw SQL in Supabase inherit no RLS protection | Use `security_invoker = true` (Postgres 15+); Supabase applies this to views created via table editor but not raw SQL |
+| Hono middleware + dual mode | Auth middleware that unconditionally imports Supabase | Compose middleware conditionally based on `DEPLOYMENT_MODE` at startup |
+| Supabase asymmetric JWT keys | Using old symmetric-key validation logic with new asymmetric keys (default from May 2025) | Use `getClaims()` from `@supabase/ssr` or verify against Supabase's published public keys, not a shared secret |
+
+---
+
+## SaaS Performance Traps
+
+| Trap | Symptoms | Prevention | When It Breaks |
+|------|----------|------------|----------------|
+| Non-LEAKPROOF functions in RLS policies | Query time grows from ms to seconds on large tables | Use only LEAKPROOF built-ins (`auth.uid()`, `=`, `AND`) in policies; no custom PL/pgSQL functions | At ~10K rows per tenant |
+| Missing index on `user_id` column in RLS policies | Sequential scans on every query; latency linear with table size | `CREATE INDEX ON providers (user_id)` and similar for every tenant-isolated table | At ~1K rows per table |
+| `getUser()` called per request (network round-trip) | 50-200ms added to every API request | Use `getClaims()` for local validation in the hot path | At 10+ concurrent users |
+| Complex subqueries in RLS policies | `EXPLAIN ANALYZE` shows nested loop on every row | Denormalize `user_id` into child tables; avoid JOIN-heavy policies | At ~100 rows with complex joins |
+
+---
+
+## SaaS Security Mistakes
+
+| Mistake | Risk | Prevention |
+|---------|------|------------|
+| Exposing `service_role` key in client bundle or Vite env vars | Full database access bypassing all RLS — complete tenant data exposure | Server-side only; never prefix with `VITE_`; never in environment variables accessible to the browser |
+| Using `user_metadata` claims in RLS policies | Users can modify `user_metadata`; policy enforcement can be bypassed by self-modifying claims | Use only `auth.uid()` (the `sub` claim) in RLS; `user_metadata` is user-writable |
+| Materialized views over tenant data | Materialized view refresh runs as superuser, copying all tenant data; RLS does not protect the materialized copy | Avoid materialized views over tenant tables; use regular views with `security_invoker = true` |
+| Provider API keys logged in request logs | Provider keys appear in plaintext in log aggregators | Redact all credential fields from logging; sanitize provider config objects before any log write |
+| Unique constraints without tenant scope | Global uniqueness error reveals that a named resource exists in another tenant | Scope all uniqueness: `UNIQUE (user_id, name)` not `UNIQUE (name)` |
+
+---
+
+## SaaS UX Pitfalls
+
+| Pitfall | User Impact | Better Approach |
+|---------|-------------|-----------------|
+| No distinction between "session expired" and "wrong provider key" in proxy 401 responses | Users cannot tell whether to re-login or check their provider API key | Return structured error codes: `auth_required` (session issue) vs `provider_key_invalid` (BYOK issue) |
+| Self-hosted users see Supabase error strings in logs or UI | Confusing references to Supabase in a self-hosted deployment | Error messages must be mode-aware; never surface Supabase-specific strings in self-hosted mode |
+| Signup requires email confirmation but UI gives no feedback | User completes signup, cannot log in, assumes the product is broken | Show explicit "check your email" UI with retry option; or disable email confirmation for initial SaaS launch |
+| No session persistence across tab close | User returns to the app and must re-login, losing their place | Use Supabase's persistent session storage (localStorage or secure cookies) correctly; do not use in-memory-only session |
+| Self-hosted mode breaks when partial Supabase env vars are present | Existing self-hosted deployments fail if a user accidentally copies Supabase config | Mode detection must be explicit via a single `DEPLOYMENT_MODE=saas|self-hosted` env var, not inferred from presence of Supabase vars |
+
+---
+
+## SaaS "Looks Done But Isn't" Checklist
+
+- [ ] **RLS enabled on every table:** `ALTER TABLE x ENABLE ROW LEVEL SECURITY` on every tenant-data table — verify with Supabase Security Advisor, not just by testing the happy path
+- [ ] **WITH CHECK present:** Every INSERT/UPDATE policy has a `WITH CHECK` clause — verify by attempting to insert a row with a different `user_id` and confirming it is rejected
+- [ ] **Self-hosted mode tested:** CI runs full test suite with `DEPLOYMENT_MODE=self-hosted` and no `SUPABASE_*` env vars — verify CI matrix configuration
+- [ ] **Cross-tenant isolation tested:** At least one test creates two users, inserts data as user A, queries as user B, asserts zero rows returned
+- [ ] **SSE auth validated for streaming:** A test that starts a streaming request and confirms the correct `user_id` is used for all DB writes throughout the stream
+- [ ] **service_role client scoped:** No `service_role` Supabase client accessible from route handlers — verify by checking initialization scope in code
+- [ ] **Provider keys not plaintext:** The `api_key` column is not readable as plaintext from the Supabase dashboard table editor
+- [ ] **Supabase imports isolated:** `grep -r "@supabase/supabase-js" src/` returns results only in files within a `db/supabase/` or equivalent Supabase-specific module directory
+- [ ] **Unique constraints tenant-scoped:** Every unique constraint on user-created entities includes `user_id` as a component — verified in migration files
+
+---
+
+## SaaS Recovery Strategies
+
+| Pitfall | Recovery Cost | Recovery Steps |
+|---------|---------------|----------------|
+| RLS not enabled discovered post-launch | HIGH | Enable RLS immediately (blocks all anon requests); add policies iteratively; audit logs for cross-tenant queries; notify affected users |
+| service_role key exposed in client bundle | HIGH | Rotate key immediately in Supabase dashboard; audit for unauthorized access; re-deploy |
+| Cross-tenant data injection via missing WITH CHECK | MEDIUM | Add WITH CHECK policies; audit affected tables for injected rows (`WHERE user_id != auth.uid()`); clean up orphaned rows |
+| Self-hosted mode broken by Supabase imports | MEDIUM | Refactor to lazy dynamic imports for Supabase modules; add CI matrix for self-hosted mode; no data loss |
+| Session variable leakage in production (SET not SET LOCAL) | HIGH | Emergency deploy with SET LOCAL; audit Postgres logs for cross-tenant auth.uid() anomalies |
+| Provider API keys stored plaintext | MEDIUM | Add encryption at application layer; migrate existing keys through encryption transform; no re-key of Supabase credentials needed |
+| DB abstraction interface leaked | MEDIUM | Freeze interface contract; fix implementations to match; add cross-implementation test suite; no data loss but potentially a breaking API change |
+
+---
+
+## SaaS Pitfall-to-Phase Mapping
+
+| Pitfall | Prevention Phase | Verification |
+|---------|------------------|--------------|
+| Self-hosted mode broken by Supabase imports | Dual-mode architecture (first phase) | CI matrix: `DEPLOYMENT_MODE=self-hosted` with zero Supabase env vars passes all tests |
+| DB abstraction interface leak | Dual-mode architecture (first phase) | CI: full test suite runs against both SQLite and Postgres implementations |
+| service_role bypass on wrong paths | Supabase client initialization (first SaaS phase) | Code review: no `service_role` client in request handler scope |
+| auth.uid() null silently returns empty rows | DB schema + RLS design | Test: unauthenticated request to protected endpoint returns 401, not empty array |
+| USING without WITH CHECK | DB schema + RLS design | Test: INSERT with wrong user_id is rejected; Supabase Security Advisor passes |
+| Unique constraints not tenant-scoped | Schema design | Test: two users can create a provider with the same name without error |
+| JWT claims SET vs SET LOCAL leakage | DB abstraction layer design | Test: concurrent requests from two users never see each other's data |
+| BYOK API keys stored plaintext | Schema design | Verification: `api_key` column not readable as plaintext from Supabase dashboard |
+| SSE mid-stream auth misconfiguration | Auth + streaming integration phase | Test: streaming request uses consistent user_id for all DB writes throughout stream |
+
+---
+
+## SaaS Sources
+
+- [Supabase RLS Official Docs](https://supabase.com/docs/guides/database/postgres/row-level-security) — auth.uid() null behavior, service role guidance, performance recommendations (HIGH confidence)
+- [Supabase RLS Performance and Best Practices](https://supabase.com/docs/guides/troubleshooting/rls-performance-and-best-practices-Z5Jjwv) — index requirements, LEAKPROOF functions, role specification (HIGH confidence)
+- [Common Postgres RLS Footguns — Bytebase](https://www.bytebase.com/blog/postgres-row-level-security-footguns/) — 16 concrete footguns including USING/WITH CHECK distinction, SECURITY DEFINER views, unique constraint data leakage (HIGH confidence)
+- [Postgres RLS Implementation Guide — Permit.io](https://www.permit.io/blog/postgres-rls-implementation-guide) — asymmetric USING/WITH CHECK, session context leakage, superuser testing false confidence (MEDIUM confidence)
+- [Multi-tenant data isolation with PostgreSQL RLS — AWS](https://aws.amazon.com/blogs/database/multi-tenant-data-isolation-with-postgresql-row-level-security/) — connection pooling and SET LOCAL patterns (HIGH confidence)
+- [PgBouncer is useful, important, and fraught with peril](https://jpcamara.com/2023/04/12/pgbouncer-is-useful.html) — transaction mode session variable leakage details (MEDIUM confidence)
+- [Supabase Security Flaw: 170+ Apps Exposed by Missing RLS](https://byteiota.com/supabase-security-flaw-170-apps-exposed-by-missing-rls/) — CVE-2025-48757 real-world incident involving missing RLS in generated code (HIGH confidence, recent incident)
+- [Supabase Auth Server-Side Advanced Guide](https://supabase.com/docs/guides/auth/server-side/advanced-guide) — getClaims() vs getUser() for server-side validation (HIGH confidence)
+- [Supabase JWT and Sessions Docs](https://supabase.com/docs/guides/auth/sessions) — token expiry, refresh mechanics, 1-hour default JWT expiry (HIGH confidence)
+- [Supabase Understanding API Keys](https://supabase.com/docs/guides/api/api-keys) — anon vs service_role scoping, key exposure risks (HIGH confidence)
+- [Use Supabase with Hono — Official Quickstart](https://supabase.com/docs/guides/getting-started/quickstarts/hono) — Hono-specific integration patterns (HIGH confidence)
+- [RLS for Tenants in Postgres — Crunchy Data](https://www.crunchydata.com/blog/row-level-security-for-tenants-in-postgres) — multi-tenant design patterns, performance indexing (MEDIUM confidence)
+
+---
+*v1.1 SaaS pitfalls for: Adding Supabase Auth + Postgres RLS multi-tenancy to 429chain*
+*Researched: 2026-03-01*
