@@ -103,9 +103,10 @@ None yet.
 | 009 | Improve terminal log formatting | 2026-02-08 | d9fcee3 | [009](./quick/009-improve-terminal-log-formatting/) |
 | 010 | Mid-stream timeout cooldown | 2026-02-08 | 8b15fc1 | [010](./quick/010-mid-stream-timeout-cooldown/) |
 | 011 | Dashboard enhancements | 2026-02-09 | 8bcc48a | [011](./quick/011-dashboard-enhancements/) |
+| 012 | Digital Ocean deployment guide (docs/DEPLOY-DIGITALOCEAN.md) | 2026-03-03 | 1a7f6f6 | [012](./quick/12-write-a-document-outlining-how-to-deploy/) |
 
 ## Session Continuity
 
-Last session: 2026-03-01
-Stopped at: Completed 09-02-PLAN.md — Phase 9 complete, ready for Phase 10
+Last session: 2026-03-03
+Stopped at: Completed quick task 12 — Digital Ocean deployment guide written
 Resume file: None
