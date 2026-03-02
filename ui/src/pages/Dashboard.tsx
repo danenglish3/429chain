@@ -24,8 +24,8 @@ interface ChainUsage {
   lastRequestTimestamp: number | null;
 }
 
-function formatNumber(num: number): string {
-  return num.toLocaleString();
+function formatNumber(num: number | null | undefined): string {
+  return (num ?? 0).toLocaleString();
 }
 
 export default function Dashboard() {

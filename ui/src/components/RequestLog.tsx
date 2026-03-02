@@ -96,8 +96,8 @@ export default function RequestLog() {
                   <td>{request.chainName}</td>
                   <td>{request.providerId}</td>
                   <td className={styles.modelCell}>{request.model}</td>
-                  <td className={styles.numberCell}>{request.totalTokens.toLocaleString()}</td>
-                  <td className={styles.numberCell}>{request.latencyMs.toLocaleString()}</td>
+                  <td className={styles.numberCell}>{(request.totalTokens ?? 0).toLocaleString()}</td>
+                  <td className={styles.numberCell}>{(request.latencyMs ?? 0).toLocaleString()}</td>
                   <td>
                     <span className={`${styles.statusBadge} ${getStatusColor(request.httpStatus)}`}>
                       {request.httpStatus}
@@ -128,15 +128,15 @@ export default function RequestLog() {
                         <div className={styles.detailGrid}>
                           <div className={styles.detailItem}>
                             <div className={styles.detailLabel}>PROMPT TOKENS</div>
-                            <div className={styles.detailValue}>{request.promptTokens.toLocaleString()}</div>
+                            <div className={styles.detailValue}>{(request.promptTokens ?? 0).toLocaleString()}</div>
                           </div>
                           <div className={styles.detailItem}>
                             <div className={styles.detailLabel}>COMPLETION TOKENS</div>
-                            <div className={styles.detailValue}>{request.completionTokens.toLocaleString()}</div>
+                            <div className={styles.detailValue}>{(request.completionTokens ?? 0).toLocaleString()}</div>
                           </div>
                           <div className={styles.detailItem}>
                             <div className={styles.detailLabel}>TOTAL TOKENS</div>
-                            <div className={styles.detailValue}>{request.totalTokens.toLocaleString()}</div>
+                            <div className={styles.detailValue}>{(request.totalTokens ?? 0).toLocaleString()}</div>
                           </div>
                           <div className={styles.detailItem}>
                             <div className={styles.detailLabel}>ATTEMPTS</div>
