@@ -20,7 +20,7 @@ COPY package.json package-lock.json ./
 RUN npm ci
 COPY tsconfig.json ./
 COPY src ./src
-RUN npm run build
+RUN npm run build:backend
 
 # Stage 3: Build Vite React SPA
 FROM node:20-slim AS ui-builder

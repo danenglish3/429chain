@@ -13,12 +13,11 @@ By the end, you will have 429chain running in production behind nginx with HTTPS
 3. [Option A: Docker Deployment (Recommended)](#3-option-a-docker-deployment-recommended)
 4. [Option B: Direct Node.js Deployment](#4-option-b-direct-nodejs-deployment)
 5. [Reverse Proxy with Nginx](#5-reverse-proxy-with-nginx)
-6. [HTTPS with Let's Encrypt](#6-https-with-lets-encrypt)
-7. [Firewall Rules](#7-firewall-rules)
-8. [Updating 429chain](#8-updating-429chain)
-9. [Backup and Restore](#9-backup-and-restore)
-10. [Monitoring](#10-monitoring)
-11. [Troubleshooting](#11-troubleshooting)
+6. [Firewall Rules](#6-firewall-rules)
+7. [Updating 429chain](#7-updating-429chain)
+8. [Backup and Restore](#8-backup-and-restore)
+9. [Monitoring](#9-monitoring)
+10. [Troubleshooting](#10-troubleshooting)
 
 ---
 
@@ -35,14 +34,14 @@ Create a new droplet with the following specifications:
 - **Region:** Choose the region closest to your users
 - **Authentication:** SSH key (recommended over password)
 
-**Domain name (optional but required for HTTPS)**
-A domain name pointing to your droplet's IP address. Add an A record in your DNS provider:
+**Domain name**
+A domain on Cloudflare pointing to your droplet's IP address. In Cloudflare DNS, add a proxied A record:
 
 ```
-A  yourdomain.com  →  your-droplet-ip
+A  proxy.everydaychef.io  →  your-droplet-ip  (Proxied ☁️)
 ```
 
-DNS propagation can take a few minutes to a few hours.
+Cloudflare handles SSL termination — no certificates are needed on the server. Set the SSL/TLS mode to **Full** in Cloudflare (not "Full (strict)" since there's no origin cert).
 
 **SSH access**
 You should be able to connect to your droplet:
@@ -392,7 +391,11 @@ journalctl -u 429chain -f
 
 ## 5. Reverse Proxy with Nginx
 
-Nginx sits in front of 429chain and handles incoming HTTP/HTTPS traffic. This is required for HTTPS and is recommended for production regardless.
+Nginx sits in front of 429chain and handles incoming HTTP traffic. Cloudflare terminates SSL at the edge, so nginx only needs to listen on port 80.
+
+If you are using the Docker deployment (Option A), nginx is included in `docker-compose.prod.yml` — skip to section 6.
+
+For the Node.js deployment (Option B), install nginx on the host:
 
 ### Install nginx
 
@@ -406,24 +409,37 @@ apt install -y nginx
 nano /etc/nginx/sites-available/429chain
 ```
 
-Paste the following (replace `yourdomain.com` with your domain, or use `_` to match all hostnames):
-
 ```nginx
 server {
     listen 80;
     listen [::]:80;
-    server_name yourdomain.com;
+    server_name proxy.everydaychef.io;
+
+    # Trust Cloudflare headers for real client IP
+    set_real_ip_from 173.245.48.0/20;
+    set_real_ip_from 103.21.244.0/22;
+    set_real_ip_from 103.22.200.0/22;
+    set_real_ip_from 103.31.4.0/22;
+    set_real_ip_from 141.101.64.0/18;
+    set_real_ip_from 108.162.192.0/18;
+    set_real_ip_from 190.93.240.0/20;
+    set_real_ip_from 188.114.96.0/20;
+    set_real_ip_from 197.234.240.0/22;
+    set_real_ip_from 198.41.128.0/17;
+    set_real_ip_from 162.158.0.0/15;
+    set_real_ip_from 104.16.0.0/13;
+    set_real_ip_from 104.24.0.0/14;
+    set_real_ip_from 172.64.0.0/13;
+    set_real_ip_from 131.0.72.0/22;
+    real_ip_header CF-Connecting-IP;
 
     # SSE and proxy settings
     location / {
         proxy_pass http://127.0.0.1:3429;
         proxy_http_version 1.1;
 
-        # WebSocket support (for future use)
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
-
-        # Pass real client information to the proxy
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -433,7 +449,6 @@ server {
         proxy_buffering off;
         proxy_cache off;
 
-        # Increase timeout for long-running streaming requests
         proxy_read_timeout 300s;
         proxy_send_timeout 300s;
     }
@@ -445,86 +460,30 @@ The `proxy_buffering off` directive is important. Without it, nginx buffers SSE 
 ### Enable the site
 
 ```bash
-# Create symlink to enable the site
 ln -s /etc/nginx/sites-available/429chain /etc/nginx/sites-enabled/
-
-# Remove the default nginx site
 rm /etc/nginx/sites-enabled/default
-
-# Test the configuration for syntax errors
 nginx -t
-# nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
-# nginx: configuration file /etc/nginx/nginx.conf test is successful
-
-# Reload nginx to apply the new config
 systemctl reload nginx
 ```
 
 ### Open the firewall for nginx
 
 ```bash
-ufw allow 'Nginx Full'
+ufw allow 'Nginx HTTP'
 ```
-
-This opens ports 80 (HTTP) and 443 (HTTPS).
 
 Verify nginx is serving traffic:
 
 ```bash
-curl http://yourdomain.com/health
+curl http://localhost/health
 # {"status":"ok","version":"0.1.0","uptime":120.5,"providers":2,"chains":1}
 ```
 
 ---
 
-## 6. HTTPS with Let's Encrypt
+## 6. Firewall Rules
 
-Certbot obtains a free TLS certificate from Let's Encrypt and automatically configures nginx to use it.
-
-### Install certbot
-
-```bash
-apt install -y certbot python3-certbot-nginx
-```
-
-### Obtain a certificate
-
-Run certbot with the nginx plugin. Replace `yourdomain.com` with your actual domain:
-
-```bash
-certbot --nginx -d yourdomain.com
-```
-
-Certbot will:
-1. Verify domain ownership by serving a challenge file via nginx
-2. Obtain the certificate from Let's Encrypt
-3. Modify your nginx config to add SSL directives and redirect HTTP to HTTPS
-
-Follow the prompts. When asked about redirecting HTTP to HTTPS, choose option 2 (redirect).
-
-After certbot completes, your nginx config at `/etc/nginx/sites-available/429chain` will be updated with SSL configuration automatically.
-
-Verify the certificate is active:
-
-```bash
-curl https://yourdomain.com/health
-# {"status":"ok","version":"0.1.0","uptime":300.2,"providers":2,"chains":1}
-```
-
-### Verify automatic renewal
-
-Let's Encrypt certificates expire every 90 days. Certbot installs a systemd timer that renews certificates automatically. Test the renewal process:
-
-```bash
-certbot renew --dry-run
-# Congratulations, all simulated renewals succeeded: ...
-```
-
----
-
-## 7. Firewall Rules
-
-With nginx in place, port 3429 should not be directly accessible from the internet. Nginx is the only entry point.
+With nginx in place, port 3429 should not be directly accessible from the internet. Cloudflare connects to nginx on port 80, and nginx proxies to 429chain internally.
 
 ### Production UFW configuration
 
@@ -532,8 +491,8 @@ With nginx in place, port 3429 should not be directly accessible from the intern
 # Allow SSH (already set up in Step 2)
 ufw allow OpenSSH
 
-# Allow nginx (HTTP + HTTPS)
-ufw allow 'Nginx Full'
+# Allow nginx HTTP (Cloudflare connects on port 80)
+ufw allow 'Nginx HTTP'
 
 # If port 3429 was previously opened directly, remove it
 # ufw delete allow 3429
@@ -551,16 +510,16 @@ ufw status numbered
 #      To                         Action      From
 #      --                         ------      ----
 # [ 1] OpenSSH                    ALLOW IN    Anywhere
-# [ 2] Nginx Full                 ALLOW IN    Anywhere
+# [ 2] Nginx HTTP                 ALLOW IN    Anywhere
 # [ 3] OpenSSH (v6)               ALLOW IN    Anywhere (v6)
-# [ 4] Nginx Full (v6)            ALLOW IN    Anywhere (v6)
+# [ 4] Nginx HTTP (v6)            ALLOW IN    Anywhere (v6)
 ```
 
-Port 3429 is not listed, which means it is only accessible from localhost (via nginx's `proxy_pass`).
+Port 3429 is not listed, which means it is only accessible from localhost (via nginx's `proxy_pass`). Port 443 is not needed since Cloudflare handles HTTPS.
 
 ---
 
-## 8. Updating 429chain
+## 7. Updating 429chain
 
 ### Docker method
 
@@ -614,7 +573,7 @@ systemctl restart 429chain
 
 ---
 
-## 9. Backup and Restore
+## 8. Backup and Restore
 
 ### Docker method
 
@@ -679,14 +638,14 @@ Store config backups securely — they contain API keys.
 
 ---
 
-## 10. Monitoring
+## 9. Monitoring
 
 ### Health check endpoint
 
 The `/health` endpoint returns the proxy status and is safe to poll without authentication:
 
 ```bash
-curl https://yourdomain.com/health
+curl https://proxy.everydaychef.io/health
 # {"status":"ok","version":"0.1.0","uptime":86400.0,"providers":3,"chains":2}
 ```
 
@@ -700,7 +659,7 @@ nano /home/deploy/check-429chain.sh
 
 ```bash
 #!/bin/bash
-HEALTH_URL="https://yourdomain.com/health"
+HEALTH_URL="https://proxy.everydaychef.io/health"
 NOTIFY_EMAIL="you@example.com"
 
 RESPONSE=$(curl -sf --max-time 5 "$HEALTH_URL" 2>/dev/null)
@@ -730,7 +689,7 @@ Note: the `mail` command requires a mail transfer agent. For simple alerting wit
 429chain includes a built-in web dashboard for visual monitoring. Access it at:
 
 ```
-https://yourdomain.com
+https://proxy.everydaychef.io
 ```
 
 The dashboard provides:
@@ -764,7 +723,7 @@ journalctl -u 429chain -p err
 
 ---
 
-## 11. Troubleshooting
+## 10. Troubleshooting
 
 ### Port already in use
 
@@ -888,16 +847,3 @@ docker compose logs -f proxy
 docker compose logs --tail=50 proxy
 ```
 
-### Certificate not renewing
-
-If certbot renewal fails:
-
-```bash
-# Check the renewal timer
-systemctl status certbot.timer
-
-# Run renewal manually with verbose output
-certbot renew --dry-run --verbose
-```
-
-Common causes: nginx is not running, or port 80 is blocked by UFW. Ensure `ufw allow 'Nginx Full'` is set.

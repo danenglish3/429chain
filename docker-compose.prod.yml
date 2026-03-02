@@ -1,17 +1,11 @@
 # 429chain Production Docker Compose
-# Includes nginx reverse proxy with HTTPS termination
+# Includes nginx reverse proxy (SSL terminated by Cloudflare)
 #
 # Setup:
-#   1. Place SSL certs in ./nginx/ssl/ (fullchain.pem + privkey.pem)
-#      Or use Let's Encrypt: see docs/DEPLOY-DIGITALOCEAN.md
-#   2. Copy config/config.example.yaml to config/config.yaml and configure
-#   3. docker compose -f docker-compose.prod.yml up -d
+#   1. Copy config/config.example.yaml to config/config.yaml and configure
+#   2. docker compose -f docker-compose.prod.yml up -d
 #
-# Self-signed certs for testing:
-#   mkdir -p nginx/ssl
-#   openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
-#     -keyout nginx/ssl/privkey.pem -out nginx/ssl/fullchain.pem \
-#     -subj "/CN=localhost"
+# Cloudflare DNS: A record for proxy.everydaychef.io → droplet IP (proxied)
 
 services:
   proxy:
@@ -45,11 +39,8 @@ services:
     container_name: 429chain-nginx
     ports:
       - "80:80"
-      - "443:443"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
-      - ./nginx/ssl:/etc/nginx/ssl:ro
-      - certbot-webroot:/var/www/certbot:ro
     depends_on:
       proxy:
         condition: service_healthy
@@ -57,6 +48,4 @@ services:
 
 volumes:
   data:
-    driver: local
-  certbot-webroot:
     driver: local
